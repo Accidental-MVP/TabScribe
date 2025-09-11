@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TabScribe Options</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; }
+        input { width: 420px; max-width: 100%; padding: 8px; }
+        button { margin-top: 10px; padding: 8px 12px; }
+        .hint { color: #555; font-size: 12px; margin-top: 6px; }
+    </style>
+    <script type="module">
+        import { getApiKey, setApiKey } from './lib/settings.js';
+        (async () => {
+            const input = document.getElementById('api');
+            input.value = await getApiKey();
+            document.getElementById('save').addEventListener('click', async () => {
+                await setApiKey(input.value.trim());
+                alert('Saved.');
+            });
+        })();
+    </script>
+    </head>
+<body>
+    <h1>TabScribe Options</h1>
+    <label for="api">Gemini API Key (used only in Hybrid mode)</label>
+    <input id="api" placeholder="AIza..." />
+    <div class="hint">Stored locally in Chrome storage. Not sent anywhere unless you enable Hybrid and trigger an AI action.</div>
+    <button id="save">Save</button>
+</body>
+</html>
+
+

@@ -27,6 +27,7 @@ modeLabel.parentElement.addEventListener('click', async () => {
 const btnExportMd = document.getElementById('btn-export-md');
 const btnExportDocx = document.getElementById('btn-export-docx');
 const btnCopyAll = document.getElementById('btn-copy-all');
+const btnJudge = document.getElementById('btn-judge');
 
 function renderCard(card) {
 	const el = document.createElement('article');
@@ -143,6 +144,10 @@ chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === 'tabscribe:mode_changed') {
         modeLabel.textContent = msg.mode === 'hybrid' ? 'Hybrid' : 'Offline';
     }
+});
+
+btnJudge?.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('judge.html') });
 });
 
 
