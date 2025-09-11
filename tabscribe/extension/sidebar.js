@@ -12,6 +12,7 @@ const modeLabel = document.getElementById('mode-label');
 const projectSelect = document.getElementById('project-select');
 const btnNewProject = document.getElementById('btn-new-project');
 const btnTrash = document.getElementById('btn-trash');
+const btnOpenAll = document.getElementById('btn-open-all');
 const searchInput = document.getElementById('search');
 
 let currentProjectId = 'default';
@@ -265,6 +266,12 @@ btnNewProject.addEventListener('click', async () => {
 	render();
 });
 btnTrash.addEventListener('click', () => { showTrash = !showTrash; btnTrash.textContent = showTrash ? 'Back' : 'Trash'; render(); });
+btnOpenAll.addEventListener('click', async () => {
+    const cards = allCardsCache.filter(c => c.projectId === currentProjectId && !c.deletedAt);
+    for (const c of cards) {
+        try { if (c.url && c.url.startsWith('http')) chrome.tabs.create({ url: c.url }); } catch {}
+    }
+});
 searchInput.addEventListener('input', () => render());
 
 render();

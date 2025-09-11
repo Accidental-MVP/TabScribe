@@ -53,7 +53,9 @@ async function saveCurrentSelectionFromTab(tabId) {
 				const link = document.querySelector('link[rel~="icon"]');
 				return link ? (new URL(link.getAttribute('href'), location.href)).toString() : '';
 			})();
-			return { title, url, favicon };
+			const isPdf = /\.pdf(\?|$)/i.test(url) || document.contentType === 'application/pdf';
+			const metaDoi = document.querySelector('meta[name="citation_doi"], meta[name="dc.identifier"]')?.getAttribute('content') || '';
+			return { title, url, favicon, isPdf, metaDoi };
 		}
 	});
 
@@ -65,15 +67,15 @@ async function saveCurrentSelectionFromTab(tabId) {
 		favicon: payload.favicon,
 		snippet: selection,
 		tags: [],
-		badges: [],
+		badges: payload.isPdf ? ['pdf'] : [],
+		doi: payload.metaDoi || '',
+		projectId: 'default',
+		deletedAt: null,
 		evidence: await captureEvidence(tabId)
 	};
 
 	await dbAddCard(card);
-	// Optionally notify the side panel to refresh
-	try {
-		await chrome.runtime.sendMessage({ type: 'tabscribe:card_added', cardId: card.id });
-	} catch {}
+	chrome.runtime.sendMessage({ type: 'tabscribe:card_added', cardId: card.id });
 }
 
 async function captureEvidence(tabId) {
@@ -86,7 +88,7 @@ async function captureEvidence(tabId) {
 				const range = sel.getRangeAt(0);
 				const container = document.createElement('div');
 				container.appendChild(range.cloneContents());
-				return container.innerHTML.slice(0, 50000); // cap size
+				return container.innerHTML.slice(0, 50000);
 			}
 		});
 		return { type: 'html', content: html };
@@ -104,11 +106,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 	}
 	if (msg?.type === 'tabscribe:set_mode') {
 		const next = msg.mode === 'hybrid' ? 'hybrid' : 'offline';
-		chrome.storage.local.set({ [STORAGE_MODE_KEY]: next }, async () => {
+		chrome.storage.local.set({ [STORAGE_MODE_KEY]: next }, () => {
 			sendResponse({ ok: true, mode: next });
-			try {
-				await chrome.runtime.sendMessage({ type: 'tabscribe:mode_changed', mode: next });
-			} catch {}
+			chrome.runtime.sendMessage({ type: 'tabscribe:mode_changed', mode: next });
 		});
 		return true;
 	}
