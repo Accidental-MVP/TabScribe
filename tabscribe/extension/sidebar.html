@@ -16,9 +16,17 @@
 			<button id="btn-sample">Sample Project</button>
 			<div class="mode-pill"><span id="mode-label">Offline</span></div>
 			<button id="btn-judge">Judge Mode</button>
+			<button id="btn-audio">Record Note</button>
 		</div>
 	</header>
 	<main>
+		<section id="onboarding" class="onboarding" style="display:none;">
+			<b>Welcome!</b> 1) Select text and press <b>Alt+S</b>. 2) Open this side panel. 3) Click <b>Draft Report</b>.
+			<button id="dismiss-onboarding" style="float:right">Dismiss</button>
+		</section>
+		<section id="dropzone" class="dropzone" style="display:none;">
+			Drop an image to explain it in 2 bullets…
+		</section>
 		<section id="cards" class="cards"></section>
 	</main>
 	<footer class="bottombar">
@@ -29,6 +37,25 @@
 			<button id="btn-copy-all">Copy All</button>
 		</div>
 	</footer>
+	<div class="modal-backdrop" id="draft-modal">
+		<div class="modal">
+			<h2>Draft Report</h2>
+			<div class="row">
+				<label for="cite-style">Citations:</label>
+				<select id="cite-style">
+					<option value="APA">APA</option>
+					<option value="MLA">MLA</option>
+				</select>
+				<button id="btn-generate-draft">Generate</button>
+				<button id="btn-close-draft">Close</button>
+			</div>
+			<textarea id="draft-output" placeholder="Draft will appear here..."></textarea>
+			<div class="row">
+				<button id="btn-copy-draft">Copy</button>
+				<button id="btn-export-draft-md">Export .md</button>
+			</div>
+		</div>
+	 </div>
 	<script type="module" src="sidebar.js"></script>
 </body>
 </html>

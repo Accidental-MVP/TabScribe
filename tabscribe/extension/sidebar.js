@@ -28,6 +28,18 @@ const btnExportMd = document.getElementById('btn-export-md');
 const btnExportDocx = document.getElementById('btn-export-docx');
 const btnCopyAll = document.getElementById('btn-copy-all');
 const btnJudge = document.getElementById('btn-judge');
+const btnAudio = document.getElementById('btn-audio');
+const draftModal = document.getElementById('draft-modal');
+const btnGenDraft = document.getElementById('btn-generate-draft');
+const btnCloseDraft = document.getElementById('btn-close-draft');
+const draftOutput = document.getElementById('draft-output');
+const citeStyleSel = document.getElementById('cite-style');
+const btnCopyDraft = document.getElementById('btn-copy-draft');
+const btnExportDraftMd = document.getElementById('btn-export-draft-md');
+import { writeDraft } from './ai/writer.js';
+const dropzone = document.getElementById('dropzone');
+const onboarding = document.getElementById('onboarding');
+const dismissOnboarding = document.getElementById('dismiss-onboarding');
 
 function renderCard(card) {
 	const el = document.createElement('article');
@@ -97,8 +109,29 @@ btnSample.addEventListener('click', async () => {
 });
 
 btnDraft.addEventListener('click', () => {
-	// Placeholder for Draft Writer UI
-	alert('Draft Report (coming soon)');
+	draftModal.style.display = 'flex';
+});
+btnCloseDraft.addEventListener('click', () => draftModal.style.display = 'none');
+btnGenDraft.addEventListener('click', async () => {
+    const cards = await dbGetAllCards();
+    const bullets = cards.map(c => c.snippet.split(/[\.!?]/)[0]).slice(0, 12);
+    const sources = cards.map(c => ({ title: c.title, url: c.url }));
+    const draft = await writeDraft('', bullets, [], sources);
+    draftOutput.value = draft;
+});
+btnCopyDraft.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(draftOutput.value || '');
+});
+btnExportDraftMd.addEventListener('click', async () => {
+    const blob = new Blob([draftOutput.value || ''], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tabscribe-draft.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 });
 
 btnExportMd.addEventListener('click', () => alert('Export Markdown (coming soon)'));
@@ -136,6 +169,7 @@ btnCopyAll.addEventListener('click', async () => {
 
 render();
 loadMode();
+initOnboarding();
 
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === 'tabscribe:card_added') {
@@ -146,8 +180,95 @@ chrome.runtime.onMessage.addListener((msg) => {
     }
 });
 
+// Multimodal: image drop explain
+document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.style.display = 'block';
+});
+document.addEventListener('dragleave', (e) => {
+    if (e.target === dropzone) dropzone.style.display = 'none';
+});
+document.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dropzone.style.display = 'none';
+    const file = e.dataTransfer?.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const b64 = await fileToDataUrl(file);
+    const explanation = await explainImage(b64);
+    await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), title: 'Image Note', url: 'about:blank', favicon: '', snippet: explanation, badges: ['image'], tags: [], evidence: { type: 'image', content: b64 } });
+});
+
+async function fileToDataUrl(file) {
+    return new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.readAsDataURL(file);
+    });
+}
+
+async function explainImage(dataUrl) {
+    try {
+        if (globalThis.chrome?.ai?.prompt) {
+            const task = await chrome.ai.prompt.create({ multimodal: true });
+            const res = await task.generate({ input: [{ type: 'image', data: dataUrl }], instructions: 'Explain this image in 2 concise bullets, plain English.' });
+            if (res?.output) return res.output;
+        }
+    } catch {}
+    return '• An image was provided.\n• Explanation unavailable in this environment.';
+}
+
+function initOnboarding() {
+    const key = 'tabscribe_onboarding_dismissed';
+    chrome.storage.local.get([key], (res) => {
+        if (!res[key]) onboarding.style.display = 'block';
+    });
+    dismissOnboarding?.addEventListener('click', () => {
+        onboarding.style.display = 'none';
+        chrome.storage.local.set({ 'tabscribe_onboarding_dismissed': true });
+    });
+}
+
 btnJudge?.addEventListener('click', () => {
     chrome.tabs.create({ url: chrome.runtime.getURL('judge.html') });
 });
+
+// Audio note capture
+btnAudio?.addEventListener('click', async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const rec = new MediaRecorder(stream);
+        const chunks = [];
+        rec.ondataavailable = (e) => chunks.push(e.data);
+        rec.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            const b64 = await blobToDataUrl(blob);
+            const transcript = await transcribeAudio(b64);
+            await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), title: 'Audio Note', url: 'about:blank', favicon: '', snippet: transcript, badges: ['audio'], tags: [], evidence: { type: 'audio', content: b64 } });
+        };
+        rec.start();
+        setTimeout(() => rec.stop(), 5000);
+    } catch (e) {
+        alert('Microphone permission denied.');
+    }
+});
+
+async function blobToDataUrl(blob) {
+    return new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.readAsDataURL(blob);
+    });
+}
+
+async function transcribeAudio(dataUrl) {
+    try {
+        if (globalThis.chrome?.ai?.prompt) {
+            const task = await chrome.ai.prompt.create({ multimodal: true });
+            const res = await task.generate({ input: [{ type: 'audio', data: dataUrl }], instructions: 'Transcribe the audio as clear notes.' });
+            if (res?.output) return res.output;
+        }
+    } catch {}
+    return 'Audio note captured. Transcription unavailable in this environment.';
+}
 
 
