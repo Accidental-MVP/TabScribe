@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>TabScribe</title>
+	<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+	<header class="topbar">
+		<div class="brand">
+			<img src="icons/icon.svg" alt="" class="icon"/>
+			<span>TabScribe</span>
+		</div>
+		<div class="controls">
+			<button id="btn-sample">Sample Project</button>
+			<div class="mode-pill"><span id="mode-label">Offline</span></div>
+		</div>
+	</header>
+	<main>
+		<section id="cards" class="cards"></section>
+	</main>
+	<footer class="bottombar">
+		<button id="btn-draft">Draft Report</button>
+		<div class="exports">
+			<button id="btn-export-md">Export .md</button>
+			<button id="btn-export-docx">Export .docx</button>
+			<button id="btn-copy-all">Copy All</button>
+		</div>
+	</footer>
+	<script type="module" src="sidebar.js"></script>
+</body>
+</html>
+
+

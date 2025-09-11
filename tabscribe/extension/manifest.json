@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "TabScribe",
+  "description": "Capture snippets from the web and build drafts with on-device AI.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "121",
+  
+  "permissions": [
+    "contextMenus",
+    "sidePanel",
+    "storage",
+    "activeTab",
+    "scripting",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_title": "Open TabScribe"
+  },
+  "background": {
+    "service_worker": "service_worker.js",
+    "type": "module"
+  },
+  "commands": {
+    "save-selection": {
+      "suggested_key": {
+        "default": "Alt+S"
+      },
+      "description": "Save current selection to TabScribe"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidebar.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "sidebar.html",
+        "styles.css"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
+
+
