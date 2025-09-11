@@ -44,9 +44,28 @@ const dismissOnboarding = document.getElementById('dismiss-onboarding');
 function renderCard(card) {
 	const el = document.createElement('article');
 	el.className = 'card';
+	
+	// Create badges markup if any exist
+	const badgesHtml = card.badges && card.badges.length ? `
+		<div class="card-badges">
+			${card.badges.map(badge => {
+				const label = {
+					'summ': 'Summarized',
+					'rewr': 'Rewritten',
+					'proof': 'Proofread',
+					'trans': 'Translated',
+					'image': 'Image',
+					'audio': 'Audio'
+				}[badge] || badge;
+				return `<span class="badge">${label}</span>`;
+			}).join('')}
+		</div>
+	` : '';
+	
 	el.innerHTML = `
+		${badgesHtml}
 		<div class="card-head">
-			<img class="fav" src="${card.favicon || 'icons/icon16.png'}" alt=""/>
+			<img class="fav" src="${card.favicon || 'icons/icon.svg'}" alt=""/>
 			<div class="meta">
 				<div class="title">${escapeHtml(card.title || 'Untitled')}</div>
 				<a class="url" href="${card.url}" target="_blank">${new URL(card.url).hostname}</a>
@@ -86,16 +105,52 @@ cardsEl.addEventListener('click', async (e) => {
 	const container = btn.closest('.actions');
 	const id = container?.getAttribute('data-id');
 	if (!id) return;
-	const cards = await dbGetAllCards();
-	const card = cards.find(c => c.id === id);
-	if (!card) return;
-	let nextSnippet = card.snippet;
-	if (act === 'summ') nextSnippet = await summarizeText(card.snippet);
-	if (act === 'rewr') nextSnippet = await rewriteText(card.snippet, 'Concise');
-	if (act === 'proof') nextSnippet = await proofreadText(card.snippet);
-	if (act === 'trans') nextSnippet = await translateText(card.snippet, 'fr');
-	const nextBadges = Array.from(new Set([...(card.badges || []), act]));
-	await dbUpdateCard(id, { snippet: nextSnippet, badges: nextBadges });
+	
+	// Show processing state
+	const originalText = btn.textContent;
+	btn.textContent = '...';
+	btn.disabled = true;
+	btn.style.opacity = '0.7';
+	
+	try {
+		const cards = await dbGetAllCards();
+		const card = cards.find(c => c.id === id);
+		if (!card) return;
+		
+		let nextSnippet = card.snippet;
+		
+		// Process based on action type
+		if (act === 'summ') {
+			nextSnippet = await summarizeText(card.snippet);
+			btn.textContent = '✓ Summarized';
+		} else if (act === 'rewr') {
+			nextSnippet = await rewriteText(card.snippet, 'Concise');
+			btn.textContent = '✓ Rewritten';
+		} else if (act === 'proof') {
+			nextSnippet = await proofreadText(card.snippet);
+			btn.textContent = '✓ Proofread';
+		} else if (act === 'trans') {
+			nextSnippet = await translateText(card.snippet, 'fr');
+			btn.textContent = '✓ Translated';
+		}
+		
+		const nextBadges = Array.from(new Set([...(card.badges || []), act]));
+		await dbUpdateCard(id, { snippet: nextSnippet, badges: nextBadges });
+		
+		// Restore button after short delay
+		setTimeout(() => {
+			btn.disabled = false;
+			btn.style.opacity = '1';
+			btn.textContent = originalText;
+		}, 1500);
+	} catch (err) {
+		btn.textContent = '✗ Error';
+		setTimeout(() => {
+			btn.disabled = false;
+			btn.style.opacity = '1';
+			btn.textContent = originalText;
+		}, 1500);
+	}
 });
 
 btnSample.addEventListener('click', async () => {

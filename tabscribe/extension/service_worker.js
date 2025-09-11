@@ -17,6 +17,11 @@ chrome.runtime.onInstalled.addListener(() => {
 	chrome.storage.local.set({ [STORAGE_MODE_KEY]: 'offline' });
 });
 
+// Toggle side panel when extension icon is clicked
+chrome.action.onClicked.addListener((tab) => {
+	chrome.sidePanel.open({ windowId: tab.windowId });
+});
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 	if (info.menuItemId !== CONTEXT_ID_SAVE || !tab?.id) return;
 	await saveCurrentSelectionFromTab(tab.id);
