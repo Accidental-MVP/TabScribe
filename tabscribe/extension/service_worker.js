@@ -71,7 +71,9 @@ async function saveCurrentSelectionFromTab(tabId) {
 
 	await dbAddCard(card);
 	// Optionally notify the side panel to refresh
-	chrome.runtime.sendMessage({ type: 'tabscribe:card_added', cardId: card.id });
+	try {
+		await chrome.runtime.sendMessage({ type: 'tabscribe:card_added', cardId: card.id });
+	} catch {}
 }
 
 async function captureEvidence(tabId) {
@@ -102,9 +104,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 	}
 	if (msg?.type === 'tabscribe:set_mode') {
 		const next = msg.mode === 'hybrid' ? 'hybrid' : 'offline';
-		chrome.storage.local.set({ [STORAGE_MODE_KEY]: next }, () => {
+		chrome.storage.local.set({ [STORAGE_MODE_KEY]: next }, async () => {
 			sendResponse({ ok: true, mode: next });
-			chrome.runtime.sendMessage({ type: 'tabscribe:mode_changed', mode: next });
+			try {
+				await chrome.runtime.sendMessage({ type: 'tabscribe:mode_changed', mode: next });
+			} catch {}
 		});
 		return true;
 	}

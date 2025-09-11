@@ -36,7 +36,8 @@ const draftOutput = document.getElementById('draft-output');
 const citeStyleSel = document.getElementById('cite-style');
 const btnCopyDraft = document.getElementById('btn-copy-draft');
 const btnExportDraftMd = document.getElementById('btn-export-draft-md');
-import { writeDraft } from './ai/writer.js';
+import { writeDraftFromCards } from './ai/writer.js';
+import { promptMultimodal } from './ai/prompt.js';
 const dropzone = document.getElementById('dropzone');
 const onboarding = document.getElementById('onboarding');
 const dismissOnboarding = document.getElementById('dismiss-onboarding');
@@ -169,9 +170,7 @@ btnDraft.addEventListener('click', () => {
 btnCloseDraft.addEventListener('click', () => draftModal.style.display = 'none');
 btnGenDraft.addEventListener('click', async () => {
     const cards = await dbGetAllCards();
-    const bullets = cards.map(c => c.snippet.split(/[\.!?]/)[0]).slice(0, 12);
-    const sources = cards.map(c => ({ title: c.title, url: c.url }));
-    const draft = await writeDraft('', bullets, [], sources);
+    const draft = await writeDraftFromCards(cards, { tone: 'neutral', length: 'medium' });
     draftOutput.value = draft;
 });
 btnCopyDraft.addEventListener('click', async () => {
@@ -233,6 +232,9 @@ chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === 'tabscribe:mode_changed') {
         modeLabel.textContent = msg.mode === 'hybrid' ? 'Hybrid' : 'Offline';
     }
+    if (msg?.type === 'tabscribe:model_progress') {
+        showToast(`${msg.api}: ${(msg.loaded * 100).toFixed(0)}%`);
+    }
 });
 
 // Multimodal: image drop explain
@@ -248,9 +250,11 @@ document.addEventListener('drop', async (e) => {
     dropzone.style.display = 'none';
     const file = e.dataTransfer?.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
-    const b64 = await fileToDataUrl(file);
-    const explanation = await explainImage(b64);
-    await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), title: 'Image Note', url: 'about:blank', favicon: '', snippet: explanation, badges: ['image'], tags: [], evidence: { type: 'image', content: b64 } });
+    const explanation = await promptMultimodal([
+        { type: 'text', value: 'Explain this image in 2 concise bullets, plain English.' },
+        { type: 'image', value: file }
+    ], ['image']);
+    await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), title: 'Image Note', url: 'about:blank', favicon: '', snippet: explanation || 'Explanation unavailable.', badges: ['image'], tags: [], evidence: { type: 'image', content: await fileToDataUrl(file) } });
 });
 
 async function fileToDataUrl(file) {
@@ -259,17 +263,6 @@ async function fileToDataUrl(file) {
         r.onload = () => resolve(r.result);
         r.readAsDataURL(file);
     });
-}
-
-async function explainImage(dataUrl) {
-    try {
-        if (globalThis.chrome?.ai?.prompt) {
-            const task = await chrome.ai.prompt.create({ multimodal: true });
-            const res = await task.generate({ input: [{ type: 'image', data: dataUrl }], instructions: 'Explain this image in 2 concise bullets, plain English.' });
-            if (res?.output) return res.output;
-        }
-    } catch {}
-    return '• An image was provided.\n• Explanation unavailable in this environment.';
 }
 
 function initOnboarding() {
@@ -296,9 +289,11 @@ btnAudio?.addEventListener('click', async () => {
         rec.ondataavailable = (e) => chunks.push(e.data);
         rec.onstop = async () => {
             const blob = new Blob(chunks, { type: 'audio/webm' });
-            const b64 = await blobToDataUrl(blob);
-            const transcript = await transcribeAudio(b64);
-            await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), title: 'Audio Note', url: 'about:blank', favicon: '', snippet: transcript, badges: ['audio'], tags: [], evidence: { type: 'audio', content: b64 } });
+            const transcript = await promptMultimodal([
+                { type: 'text', value: 'Transcribe the audio as clear, concise notes.' },
+                { type: 'audio', value: blob }
+            ], ['audio']);
+            await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), title: 'Audio Note', url: 'about:blank', favicon: '', snippet: transcript || 'Transcription unavailable.', badges: ['audio'], tags: [], evidence: { type: 'audio', content: await blobToDataUrl(blob) } });
         };
         rec.start();
         setTimeout(() => rec.stop(), 5000);
@@ -315,15 +310,26 @@ async function blobToDataUrl(blob) {
     });
 }
 
-async function transcribeAudio(dataUrl) {
-    try {
-        if (globalThis.chrome?.ai?.prompt) {
-            const task = await chrome.ai.prompt.create({ multimodal: true });
-            const res = await task.generate({ input: [{ type: 'audio', data: dataUrl }], instructions: 'Transcribe the audio as clear notes.' });
-            if (res?.output) return res.output;
-        }
-    } catch {}
-    return 'Audio note captured. Transcription unavailable in this environment.';
+function showToast(text) {
+    let el = document.getElementById('toast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'toast';
+        el.style.position = 'fixed';
+        el.style.bottom = '16px';
+        el.style.right = '16px';
+        el.style.background = '#101522';
+        el.style.border = '1px solid #2a3142';
+        el.style.color = '#e6e6e6';
+        el.style.borderRadius = '8px';
+        el.style.padding = '8px 12px';
+        el.style.zIndex = '9999';
+        document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.style.opacity = '1';
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => { el.style.opacity = '0'; }, 1500);
 }
 
 
