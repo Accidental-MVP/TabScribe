@@ -8,6 +8,22 @@ import { exportMarkdown, exportDocx } from './lib/exports.js';
 const cardsEl = document.getElementById('cards');
 const btnSample = document.getElementById('btn-sample');
 const btnDraft = document.getElementById('btn-draft');
+const modeLabel = document.getElementById('mode-label');
+
+async function loadMode() {
+    const mode = await new Promise(resolve => {
+        chrome.runtime.sendMessage({ type: 'tabscribe:get_mode' }, (res) => resolve(res?.mode || 'offline'));
+    });
+    modeLabel.textContent = mode === 'hybrid' ? 'Hybrid' : 'Offline';
+}
+
+modeLabel.parentElement.addEventListener('click', async () => {
+    const current = modeLabel.textContent === 'Hybrid' ? 'hybrid' : 'offline';
+    const next = current === 'offline' ? 'hybrid' : 'offline';
+    await new Promise(resolve => {
+        chrome.runtime.sendMessage({ type: 'tabscribe:set_mode', mode: next }, () => resolve());
+    });
+});
 const btnExportMd = document.getElementById('btn-export-md');
 const btnExportDocx = document.getElementById('btn-export-docx');
 const btnCopyAll = document.getElementById('btn-copy-all');
@@ -118,10 +134,14 @@ btnCopyAll.addEventListener('click', async () => {
 });
 
 render();
+loadMode();
 
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === 'tabscribe:card_added') {
         render();
+    }
+    if (msg?.type === 'tabscribe:mode_changed') {
+        modeLabel.textContent = msg.mode === 'hybrid' ? 'Hybrid' : 'Offline';
     }
 });
 
