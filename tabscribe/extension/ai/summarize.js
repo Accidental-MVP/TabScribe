@@ -15,8 +15,9 @@ export async function summarizeText(text) {
 			const tldr = await createSummarizer({ type: 'tldr', format: 'markdown', length: 'medium' });
 			const keypoints = await createSummarizer({ type: 'key-points', format: 'markdown', length: 'medium' });
 			if (tldr && keypoints) {
-				const tldrOut = await tldr.summarize(text, { context: 'Audience: general; concise and factual.' });
-				const kpOut = await keypoints.summarize(text, { context: 'Extract top 5 key ideas as bullets.' });
+				const lang = preferredOutputLanguage();
+				const tldrOut = await tldr.summarize(text, { context: 'Audience: general; concise and factual.', outputLanguage: lang });
+				const kpOut = await keypoints.summarize(text, { context: 'Extract top 5 key ideas as bullets.', outputLanguage: lang });
 				const quote = pickStandoutQuote(text);
 				return `${tldrOut}\n\n${kpOut}\n\n> "${quote}"`;
 			}

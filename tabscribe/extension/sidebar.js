@@ -153,8 +153,22 @@ function renderCard(card) {
 
 	document.addEventListener('click', () => { toggleMenu(menuMore, false); toggleMenu(menuCite, false); toggleMenu(menuMove, false); }, { once: true });
 
-	menuMore.querySelector('[data-more="delete"]').addEventListener('click', async () => { await dbSoftDeleteCard(card.id); });
-	menuMore.querySelector('[data-more="restore"]').addEventListener('click', async () => { await dbRestoreCard(card.id); });
+	menuMore.querySelector('[data-more="delete"]').addEventListener('click', async () => {
+		if (showTrash) {
+			try {
+				await new Promise(resolve => {
+					try { chrome.runtime.sendMessage({ type: 'tabscribe:purge_card', id: card.id }, () => resolve()); }
+					catch { resolve(); }
+				});
+				render();
+			} catch {}
+		} else {
+			await dbSoftDeleteCard(card.id);
+		}
+	});
+	const restoreBtn = menuMore.querySelector('[data-more="restore"]');
+	restoreBtn.style.display = showTrash ? '' : 'none';
+	restoreBtn.addEventListener('click', async () => { await dbRestoreCard(card.id); });
 	menuMore.querySelector('[data-more="move"]').addEventListener('click', async (e) => {
 		e.stopPropagation();
 		// Cache rects BEFORE awaiting
