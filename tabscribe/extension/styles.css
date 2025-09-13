@@ -116,7 +116,7 @@ main {
 	box-shadow: var(--shadow);
 	transition: transform 0.2s ease, box-shadow 0.2s ease;
 	position: relative;
-	overflow: hidden;
+	overflow: visible;
 }
 .card:hover {
 	transform: translateY(-2px);

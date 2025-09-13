@@ -114,10 +114,11 @@ function renderCard(card) {
 					<button data-cite="mla">Copy MLA</button>
 				</div>
 				<div class="menu" data-menu="more">
-					<button data-more="move">Move to…</button>
+					<button data-more="move">Move to… ▸</button>
 					<button data-more="delete">Delete</button>
 					<button data-more="restore">Restore</button>
 				</div>
+				<div class="menu" data-menu="move"></div>
 			</div>
 		</div>
 		<div class="snippet">${escapeHtml(card.snippet)}</div>
@@ -131,6 +132,7 @@ function renderCard(card) {
 	// Menus
 	const menuMore = el.querySelector('[data-menu="more"]');
 	const menuCite = el.querySelector('[data-menu="cite"]');
+	const menuMove = el.querySelector('[data-menu="move"]');
 
 	function toggleMenu(menu, show) {
 		menu.style.display = show ? 'block' : 'none';
@@ -139,21 +141,45 @@ function renderCard(card) {
 	el.querySelector('[data-act="more"]').addEventListener('click', (e) => {
 		e.stopPropagation();
 		toggleMenu(menuCite, false);
+		toggleMenu(menuMove, false);
 		toggleMenu(menuMore, menuMore.style.display !== 'block');
 	});
 	el.querySelector('[data-act="cite"]').addEventListener('click', (e) => {
 		e.stopPropagation();
 		toggleMenu(menuMore, false);
+		toggleMenu(menuMove, false);
 		toggleMenu(menuCite, menuCite.style.display !== 'block');
 	});
 
-	document.addEventListener('click', () => { toggleMenu(menuMore, false); toggleMenu(menuCite, false); }, { once: true });
+	document.addEventListener('click', () => { toggleMenu(menuMore, false); toggleMenu(menuCite, false); toggleMenu(menuMove, false); }, { once: true });
 
 	menuMore.querySelector('[data-more="delete"]').addEventListener('click', async () => { await dbSoftDeleteCard(card.id); });
 	menuMore.querySelector('[data-more="restore"]').addEventListener('click', async () => { await dbRestoreCard(card.id); });
-	menuMore.querySelector('[data-more="move"]').addEventListener('click', async () => {
-		const pid = prompt('Move to project id:');
-		if (pid) await dbUpdateCard(card.id, { projectId: pid });
+	menuMore.querySelector('[data-more="move"]').addEventListener('click', async (e) => {
+		e.stopPropagation();
+		// Cache anchor metrics BEFORE awaiting
+		const anchor = e.currentTarget;
+		const baseLeft = anchor ? anchor.offsetLeft : 0;
+		const baseTop = anchor ? anchor.offsetTop : 0;
+		const baseWidth = anchor ? anchor.offsetWidth : 0;
+		// Populate list of projects
+		const projects = await dbGetProjects();
+		if (!projects.length) { menuMove.innerHTML = '<button disabled>No projects</button>'; }
+		else { menuMove.innerHTML = projects.map(p => `<button data-target="${p.id}">${p.name}</button>`).join(''); }
+		// Attach listeners
+		menuMove.querySelectorAll('button').forEach(btn => {
+			btn.addEventListener('click', async (ev) => {
+				ev.stopPropagation();
+				const pid = btn.getAttribute('data-target');
+				if (pid && pid !== card.projectId) { await dbUpdateCard(card.id, { projectId: pid }); render(); }
+				toggleMenu(menuMove, false);
+				toggleMenu(menuMore, false);
+			});
+		});
+		// Position relative to the "Move to…" button
+		menuMove.style.left = (baseLeft + baseWidth + 6) + 'px';
+		menuMove.style.top = baseTop + 'px';
+		toggleMenu(menuMove, true);
 	});
 
 	menuCite.querySelector('[data-cite="bibtex"]').addEventListener('click', async () => {
