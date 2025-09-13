@@ -207,16 +207,25 @@ cardsEl.addEventListener('click', async (e) => {
 });
 
 btnSample.addEventListener('click', async () => {
+	const sampleId = 'sample-project';
+	const projects = await dbGetProjects();
+	if (!projects.find(p => p.id === sampleId)) {
+		await dbAddProject({ id: sampleId, name: 'Sample Project' });
+	}
+	currentProjectId = sampleId;
+	await loadProjects();
+
 	const samples = [
 		{ title: 'arXiv: LLM Hallucinations', url: 'https://arxiv.org/pdf/2401.00001.pdf', favicon: '', snippet: 'We study hallucination taxonomy...', badges: ['pdf'] },
 		{ title: 'Nature News: AI Policy', url: 'https://www.nature.com/articles/ai-policy', favicon: '', snippet: 'Regulators push new guidelines...', badges: [] },
 		{ title: 'Blog: Eval Methods', url: 'https://example.com/blog/evals', favicon: '', snippet: 'Choosing the right evaluation metrics...', badges: [] },
-		{ title: 'Chart Image', url: 'about:blank', favicon: '', snippet: 'Accuracy rose 8%.\nCost halved across runs.', badges: ['image'] },
+		{ title: 'Chart Image', url: 'about:blank', favicon: '', snippet: 'Accuracy rose 8%.\\nCost halved across runs.', badges: ['image'] },
 		{ title: 'Audio Reminder', url: 'about:blank', favicon: '', snippet: 'Compare eval datasets.', badges: ['audio'] },
 	];
 	for (const s of samples) {
-		await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), projectId: currentProjectId, deletedAt: null, tags: [], evidence: null, ...s });
+		await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), projectId: sampleId, deletedAt: null, tags: [], evidence: null, ...s });
 	}
+	render();
 });
 
 btnDraft.addEventListener('click', () => { draftModal.style.display = 'flex'; });
