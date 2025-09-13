@@ -157,11 +157,11 @@ function renderCard(card) {
 	menuMore.querySelector('[data-more="restore"]').addEventListener('click', async () => { await dbRestoreCard(card.id); });
 	menuMore.querySelector('[data-more="move"]').addEventListener('click', async (e) => {
 		e.stopPropagation();
-		// Cache anchor metrics BEFORE awaiting
+		// Cache rects BEFORE awaiting
 		const anchor = e.currentTarget;
-		const baseLeft = anchor ? anchor.offsetLeft : 0;
-		const baseTop = anchor ? anchor.offsetTop : 0;
-		const baseWidth = anchor ? anchor.offsetWidth : 0;
+		const container = menuMore.parentElement;
+		const anchorRect = anchor.getBoundingClientRect();
+		const containerRect = container.getBoundingClientRect();
 		// Populate list of projects
 		const projects = await dbGetProjects();
 		if (!projects.length) { menuMove.innerHTML = '<button disabled>No projects</button>'; }
@@ -176,9 +176,18 @@ function renderCard(card) {
 				toggleMenu(menuMore, false);
 			});
 		});
-		// Position relative to the "Move to…" button
-		menuMove.style.left = (baseLeft + baseWidth + 6) + 'px';
-		menuMove.style.top = baseTop + 'px';
+		// Position relative to the "Move to…" button; flip if overflowing right
+		const approxWidth = 240;
+		const willOverflowRight = (anchorRect.right + 6 + approxWidth) > (window.innerWidth - 8);
+		const topOffset = Math.max(0, anchorRect.top - containerRect.top - 4);
+		menuMove.style.top = topOffset + 'px';
+		if (willOverflowRight) {
+			menuMove.style.left = 'auto';
+			menuMove.style.right = (containerRect.right - anchorRect.left + 6) + 'px';
+		} else {
+			menuMove.style.right = 'auto';
+			menuMove.style.left = (anchorRect.right - containerRect.left + 6) + 'px';
+		}
 		toggleMenu(menuMove, true);
 	});
 
