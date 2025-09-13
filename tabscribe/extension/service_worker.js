@@ -3,7 +3,7 @@
 // - Handles keyboard command Alt+S
 // - Relays save requests to content script and persists via db
 
-import { dbAddCard } from './lib/db.js';
+import { dbAddCard, dbGetAllCards, dbDeleteCard } from './lib/db.js';
 
 const CONTEXT_ID_SAVE = 'tabscribe_save_selection';
 const STORAGE_MODE_KEY = 'tabscribe_mode'; // 'offline' | 'hybrid'
@@ -15,12 +15,36 @@ chrome.runtime.onInstalled.addListener(() => {
 		title: 'Save to TabScribe'
 	});
 	chrome.storage.local.set({ [STORAGE_MODE_KEY]: 'offline' });
+	try { chrome.alarms.create('tabscribe_cleanup', { periodInMinutes: 60 * 24 }); } catch {}
+	cleanupTrashed();
 });
 
 // Toggle side panel when extension icon is clicked
 chrome.action.onClicked.addListener((tab) => {
 	chrome.sidePanel.open({ windowId: tab.windowId });
 });
+
+chrome.runtime.onStartup?.addListener?.(() => {
+	try { chrome.alarms.create('tabscribe_cleanup', { periodInMinutes: 60 * 24 }); } catch {}
+	cleanupTrashed();
+});
+
+chrome.alarms?.onAlarm?.addListener((alarm) => {
+	if (alarm?.name === 'tabscribe_cleanup') cleanupTrashed();
+});
+
+async function cleanupTrashed() {
+	try {
+		const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000;
+		const now = Date.now();
+		const cards = await dbGetAllCards();
+		for (const c of cards) {
+			if (c.deletedAt && (now - c.deletedAt) > TEN_DAYS_MS) {
+				await dbDeleteCard(c.id);
+			}
+		}
+	} catch {}
+}
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 	if (info.menuItemId !== CONTEXT_ID_SAVE || !tab?.id) return;
@@ -110,6 +134,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 			sendResponse({ ok: true, mode: next });
 			chrome.runtime.sendMessage({ type: 'tabscribe:mode_changed', mode: next });
 		});
+		return true;
+	}
+	if (msg?.type === 'tabscribe:purge_card') {
+		(async () => { try { await dbDeleteCard(msg.id); sendResponse({ ok: true }); } catch { sendResponse({ ok: false }); } })();
 		return true;
 	}
 });

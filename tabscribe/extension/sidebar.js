@@ -12,12 +12,17 @@ const modeLabel = document.getElementById('mode-label');
 const projectSelect = document.getElementById('project-select');
 const btnNewProject = document.getElementById('btn-new-project');
 const btnTrash = document.getElementById('btn-trash');
+const btnPurge = document.getElementById('btn-purge');
 const btnOpenAll = document.getElementById('btn-open-all');
 const searchInput = document.getElementById('search');
 
 let currentProjectId = 'default';
 let showTrash = false;
 let allCardsCache = [];
+
+// Purge button only visible in Trash view; Open All hidden in Trash
+if (btnPurge) btnPurge.style.display = 'none';
+if (btnOpenAll) btnOpenAll.style.display = '';
 
 async function ensureDefaultProject() {
     let projects = await dbGetProjects();
@@ -264,7 +269,24 @@ btnNewProject.addEventListener('click', async () => {
 	await loadProjects();
 	render();
 });
-btnTrash.addEventListener('click', () => { showTrash = !showTrash; btnTrash.textContent = showTrash ? 'Back' : 'Trash'; render(); });
+btnTrash.addEventListener('click', () => { 
+    showTrash = !showTrash; 
+    btnTrash.textContent = showTrash ? 'Back' : 'Trash'; 
+    if (btnPurge) btnPurge.style.display = showTrash ? '' : 'none';
+    if (btnOpenAll) btnOpenAll.style.display = showTrash ? 'none' : '';
+    render(); 
+});
+btnPurge.addEventListener('click', async () => {
+    if (!showTrash) { alert('Open Trash view first.'); return; }
+    if (!confirm('Permanently delete all items in Trash? This cannot be undone.')) return;
+    const cards = allCardsCache.filter(c => c.projectId === currentProjectId && !!c.deletedAt);
+    for (const c of cards) {
+        try {
+            await chrome.runtime.sendMessage({ type: 'tabscribe:purge_card', id: c.id });
+        } catch {}
+    }
+    setTimeout(() => render(), 300);
+});
 btnOpenAll.addEventListener('click', async () => {
     const cards = allCardsCache.filter(c => c.projectId === currentProjectId && !c.deletedAt);
     for (const c of cards) {
