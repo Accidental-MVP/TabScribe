@@ -1,6 +1,13 @@
 import { getMode } from '../lib/settings.js';
 import { geminiCall } from '../lib/hybrid.js';
 
+function preferredOutputLanguage() {
+	const n = (navigator.language || 'en').toLowerCase();
+	if (n.startsWith('es')) return 'es';
+	if (n.startsWith('ja')) return 'ja';
+	return 'en';
+}
+
 export async function summarizeText(text) {
 	// 1) Stable global Summarizer API (Chrome 138+)
 	try {
@@ -34,6 +41,7 @@ async function createSummarizer(options) {
 	if (availability === 'unavailable') return null;
 	return Summarizer.create({
 		...options,
+		outputLanguage: preferredOutputLanguage(),
 		monitor(m) {
 			m.addEventListener('downloadprogress', (e) => {
 				try { chrome.runtime?.sendMessage({ type: 'tabscribe:model_progress', api: 'summarizer', loaded: e.loaded }); } catch {}
