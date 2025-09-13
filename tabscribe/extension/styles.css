@@ -180,6 +180,28 @@ main {
 	border-radius: 4px;
 	font-weight: 500;
 }
+/* Menus */
+.menu {
+	position: absolute;
+	background: var(--panel);
+	border: 1px solid #2a3142;
+	border-radius: 8px;
+	min-width: 160px;
+	box-shadow: var(--shadow);
+	z-index: 50;
+	padding: 6px;
+	display: none;
+}
+.menu.open { display: block; }
+.menu button {
+	width: 100%;
+	text-align: left;
+	background: transparent;
+	border: none;
+	padding: 8px 10px;
+	border-radius: 6px;
+}
+.menu button:hover { background: #1c2332; }
 button { 
 	background: var(--btn); 
 	color: var(--text); 

@@ -1,11 +1,23 @@
 let session;
 
+function getDefaultOutputLanguage() {
+	try {
+		const lang = (navigator.language || 'en').toLowerCase();
+		if (lang.startsWith('es')) return 'es';
+		if (lang.startsWith('ja')) return 'ja';
+		return 'en';
+	} catch {
+		return 'en';
+	}
+}
+
 async function getSession(opts = {}) {
 	if (!('LanguageModel' in self)) return null;
 	const available = await LanguageModel.availability();
 	if (available === 'unavailable') return null;
 	if (!session) {
 		session = await LanguageModel.create({
+			outputLanguage: getDefaultOutputLanguage(),
 			...opts,
 			monitor(m) {
 				m.addEventListener('downloadprogress', e => {

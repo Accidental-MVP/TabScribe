@@ -105,9 +105,19 @@ function renderCard(card) {
 				<div class="title">${escapeHtml(card.title || 'Untitled')}</div>
 				<a class="url" href="${card.url}" target="_blank">${new URL(card.url).hostname}</a>
 			</div>
-			<div style="margin-left:auto; display:flex; gap:6px;">
+			<div style="margin-left:auto; display:flex; gap:6px; position:relative;">
 				<button data-act="cite">Cite ▾</button>
 				<button data-act="more">⋮</button>
+				<div class="menu" data-menu="cite">
+					<button data-cite="bibtex">Copy BibTeX</button>
+					<button data-cite="apa">Copy APA</button>
+					<button data-cite="mla">Copy MLA</button>
+				</div>
+				<div class="menu" data-menu="more">
+					<button data-more="move">Move to…</button>
+					<button data-more="delete">Delete</button>
+					<button data-more="restore">Restore</button>
+				</div>
 			</div>
 		</div>
 		<div class="snippet">${escapeHtml(card.snippet)}</div>
@@ -118,24 +128,45 @@ function renderCard(card) {
 			<button data-act="trans">Translate</button>
 		</div>
 	`;
-	// Simple context actions
-	el.querySelector('[data-act="more"]').addEventListener('click', async () => {
-		const op = prompt('Action: move|delete|restore');
-		if (op === 'delete') await dbSoftDeleteCard(card.id);
-		if (op === 'restore') await dbRestoreCard(card.id);
-		if (op === 'move') {
-			const pid = prompt('Move to project id:');
-			if (pid) await dbUpdateCard(card.id, { projectId: pid });
-		}
+	// Menus
+	const menuMore = el.querySelector('[data-menu="more"]');
+	const menuCite = el.querySelector('[data-menu="cite"]');
+
+	function toggleMenu(menu, show) {
+		menu.style.display = show ? 'block' : 'none';
+	}
+
+	el.querySelector('[data-act="more"]').addEventListener('click', (e) => {
+		e.stopPropagation();
+		toggleMenu(menuCite, false);
+		toggleMenu(menuMore, menuMore.style.display !== 'block');
 	});
-	el.querySelector('[data-act="cite"]').addEventListener('click', async () => {
-		const op = prompt('Cite: bibtex|apa|mla');
-		if (!op) return;
-		// Placeholder: real metadata fetch hooked later
+	el.querySelector('[data-act="cite"]').addEventListener('click', (e) => {
+		e.stopPropagation();
+		toggleMenu(menuMore, false);
+		toggleMenu(menuCite, menuCite.style.display !== 'block');
+	});
+
+	document.addEventListener('click', () => { toggleMenu(menuMore, false); toggleMenu(menuCite, false); }, { once: true });
+
+	menuMore.querySelector('[data-more="delete"]').addEventListener('click', async () => { await dbSoftDeleteCard(card.id); });
+	menuMore.querySelector('[data-more="restore"]').addEventListener('click', async () => { await dbRestoreCard(card.id); });
+	menuMore.querySelector('[data-more="move"]').addEventListener('click', async () => {
+		const pid = prompt('Move to project id:');
+		if (pid) await dbUpdateCard(card.id, { projectId: pid });
+	});
+
+	menuCite.querySelector('[data-cite="bibtex"]').addEventListener('click', async () => {
 		const meta = { title: card.title, url: card.url, authors: [], year: '', venue: '', doi: card.doi };
-		if (op === 'bibtex') await navigator.clipboard.writeText('@article{ref, title={' + (meta.title||'') + '}, url={' + (meta.url||'') + '}}');
-		if (op === 'apa') await navigator.clipboard.writeText(`${meta.title}. ${meta.url}`);
-		if (op === 'mla') await navigator.clipboard.writeText(`${meta.title}. ${meta.url}`);
+		await navigator.clipboard.writeText('@article{ref, title={' + (meta.title||'') + '}, url={' + (meta.url||'') + '}}');
+	});
+	menuCite.querySelector('[data-cite="apa"]').addEventListener('click', async () => {
+		const meta = { title: card.title, url: card.url };
+		await navigator.clipboard.writeText(`${meta.title}. ${meta.url}`);
+	});
+	menuCite.querySelector('[data-cite="mla"]').addEventListener('click', async () => {
+		const meta = { title: card.title, url: card.url };
+		await navigator.clipboard.writeText(`${meta.title}. ${meta.url}`);
 	});
 	return el;
 }
