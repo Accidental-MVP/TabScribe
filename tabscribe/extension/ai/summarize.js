@@ -16,8 +16,14 @@ export async function summarizeText(text) {
 			const keypoints = await createSummarizer({ type: 'key-points', format: 'markdown', length: 'medium' });
 			if (tldr && keypoints) {
 				const lang = preferredOutputLanguage();
-				const tldrOut = await tldr.summarize(text, { context: 'Audience: general; concise and factual.', outputLanguage: lang });
-				const kpOut = await keypoints.summarize(text, { context: 'Extract top 5 key ideas as bullets.', outputLanguage: lang });
+				const tldrOut = await tldr.summarize(text, { 
+					context: 'Audience: academic researchers; tone: concise, formal, and factual. Task: Extract the central claim, methodology (if any), and implications in 2–3 sentences. Return in Markdown. If direct quotations are present, preserve one standout quote verbatim and mark it with quotation marks.',
+					outputLanguage: lang 
+				});
+				const kpOut = await keypoints.summarize(text, { 
+					context: 'List the top 5 key findings or arguments as bullet points with clear, neutral language. Return Markdown.',
+					outputLanguage: lang 
+				});
 				const quote = pickStandoutQuote(text);
 				return `${tldrOut}\n\n${kpOut}\n\n> "${quote}"`;
 			}
@@ -27,7 +33,7 @@ export async function summarizeText(text) {
 	// 2) Hybrid fallback
 	if ((await getMode()) === 'hybrid') {
 		try {
-			return await geminiCall(`Summarize in 2–3 sentences, then 5 bullets, then a standout quote. Return Markdown.\n\n${text}`);
+			return await geminiCall(`Summarize the text for academic research.\n1. Write a concise 2–3 sentence abstract-style summary: include purpose, method, result/implication if present.\n2. List 5 bullet points with key findings/arguments (scholarly tone, precise, no fluff).\n3. Append one standout quote verbatim if available.\nReturn Markdown only.\n\n${text}`);
 		} catch {}
 	}
 

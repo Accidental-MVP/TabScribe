@@ -57,6 +57,12 @@ modeLabel.parentElement.addEventListener('click', async () => {
     await new Promise(resolve => {
         chrome.runtime.sendMessage({ type: 'tabscribe:set_mode', mode: next }, () => resolve());
     });
+    if (next === 'hybrid') {
+        const key = await getApiKey();
+        hybridBanner.style.display = key ? 'none' : 'block';
+    } else {
+        hybridBanner.style.display = 'none';
+    }
 });
 const btnExportMd = document.getElementById('btn-export-md');
 const btnExportDocx = document.getElementById('btn-export-docx');
@@ -73,10 +79,13 @@ const btnExportDraftMd = document.getElementById('btn-export-draft-md');
 import { writeDraftFromCards } from './ai/writer.js';
 import { fetchMetadata } from './lib/academic.js';
 import { formatAPA, formatMLA, formatHarvard, formatBibTeX } from './lib/citations.js';
+import { getApiKey } from './lib/settings.js';
 import { promptMultimodal } from './ai/prompt.js';
 const dropzone = document.getElementById('dropzone');
 const onboarding = document.getElementById('onboarding');
 const dismissOnboarding = document.getElementById('dismiss-onboarding');
+const hybridBanner = document.getElementById('hybrid-banner');
+const openOptionsBtn = document.getElementById('open-options');
 
 function renderCard(card) {
 	const el = document.createElement('article');
@@ -467,6 +476,7 @@ function initOnboarding() {
 }
 
 btnJudge?.addEventListener('click', () => { chrome.tabs.create({ url: chrome.runtime.getURL('judge.html') }); });
+openOptionsBtn?.addEventListener('click', () => { try { chrome.runtime.openOptionsPage(); } catch {} });
 
 // Audio note capture
 btnAudio?.addEventListener('click', async () => {

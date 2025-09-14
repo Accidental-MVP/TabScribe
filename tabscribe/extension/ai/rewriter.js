@@ -28,7 +28,7 @@ export async function rewriteText(text, tonePreset = 'Concise', sharedContext = 
 				});
 			}
 			if (rewriter) {
-				const result = await rewriter.rewrite(text, { context: 'Improve clarity and flow; preserve meaning and [1],[2] citations.' });
+				const result = await rewriter.rewrite(text, { context: 'Context: Improve clarity, precision, and logical flow for scholarly writing. Preserve technical terms, numerical values, and inline citations ([1],[2]). Do not simplify jargon that is essential for accuracy.' });
 				rewriter.destroy?.();
 				if (result) return result;
 			}
@@ -37,7 +37,7 @@ export async function rewriteText(text, tonePreset = 'Concise', sharedContext = 
 
 	// 2) Hybrid fallback
 	if ((await getMode()) === 'hybrid') {
-		try { return await geminiCall(`Rewrite in ${tonePreset} tone, improve clarity, preserve citations.\n\n${text}`); } catch {}
+		try { return await geminiCall(`Rewrite the text in ${tonePreset} academic style.\n- Improve clarity, logical flow, and conciseness.\n- Preserve meaning, technical terminology, and all inline citations ([1],[2]).\n- Maintain an objective, scholarly tone.\nOutput only the rewritten text.\n\n${text}`); } catch {}
 	}
 
 	// 3) Local stub

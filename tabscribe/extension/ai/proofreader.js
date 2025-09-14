@@ -12,7 +12,7 @@ export async function proofreadText(text) {
 
 	if ((await getMode()) === 'hybrid') {
 		try {
-			return await geminiCall(`Proofread and correct grammar and clarity; return only corrected text.\n\nTEXT:\n${text}`);
+			return await geminiCall(`Proofread this text for academic correctness.\n- Correct grammar, syntax, and punctuation.\n- Improve readability without changing meaning.\n- Preserve technical terms, equations, and inline citations ([1], [2]).\n- Return only the corrected text.\n\n${text}`);
 		} catch {}
 	}
 
