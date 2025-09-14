@@ -394,6 +394,7 @@ btnCopyAll.addEventListener('click', async () => {
 
 projectSelect.addEventListener('change', async () => {
 	currentProjectId = projectSelect.value;
+	try { chrome.storage.local.set({ 'tabscribe_current_project': currentProjectId }); } catch {}
 	render();
 });
 btnNewProject.addEventListener('click', async () => {

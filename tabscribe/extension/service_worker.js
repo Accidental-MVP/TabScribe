@@ -7,6 +7,7 @@ import { dbAddCard, dbGetAllCards, dbDeleteCard } from './lib/db.js';
 
 const CONTEXT_ID_SAVE = 'tabscribe_save_selection';
 const STORAGE_MODE_KEY = 'tabscribe_mode'; // 'offline' | 'hybrid'
+const STORAGE_PROJECT_KEY = 'tabscribe_current_project';
 
 chrome.runtime.onInstalled.addListener(() => {
 	chrome.contextMenus.create({
@@ -83,6 +84,18 @@ async function saveCurrentSelectionFromTab(tabId) {
 		}
 	});
 
+	// Resolve target project (defaults to 'default')
+	let targetProject = 'default';
+	try {
+		await new Promise((resolve) => {
+			chrome.storage.local.get([STORAGE_PROJECT_KEY], (res) => {
+				const v = res?.[STORAGE_PROJECT_KEY];
+				if (typeof v === 'string' && v) targetProject = v;
+				resolve();
+			});
+		});
+	} catch {}
+
 	const card = {
 		id: crypto.randomUUID(),
 		createdAt: Date.now(),
@@ -93,7 +106,7 @@ async function saveCurrentSelectionFromTab(tabId) {
 		tags: [],
 		badges: payload.isPdf ? ['pdf'] : [],
 		doi: payload.metaDoi || '',
-		projectId: 'default',
+		projectId: targetProject,
 		deletedAt: null,
 		evidence: await captureEvidence(tabId)
 	};
