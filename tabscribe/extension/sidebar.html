@@ -80,6 +80,30 @@
 			</div>
 		</div>
 	 </div>
+	<div class="modal-backdrop" id="similar-modal">
+		<div class="modal">
+			<h2>Literature Lens</h2>
+			<div class="row" id="lens-filters">
+				<button data-lens-tab="refs">References</button>
+				<button data-lens-tab="cited">Cited By</button>
+				<button data-lens-tab="similar" class="active">Similar</button>
+				<span style="flex:1"></span>
+				<label><input type="checkbox" id="filter-oa"/> Open Access</label>
+				<label><input type="checkbox" id="filter-recent"/> Last 5y</label>
+				<button id="refresh-lens">Refresh</button>
+			</div>
+			<div id="lens-graph" style="height:120px; margin:6px 0; border:1px solid #2a3142; border-radius:8px;"></div>
+			<div id="lens-list">Searching…</div>
+			<div class="row" id="lens-pagination" style="display:none;">
+				<button id="lens-prev" disabled>← Prev</button>
+				<span id="lens-page-info">Page 1 of 1</span>
+				<button id="lens-next" disabled>Next →</button>
+			</div>
+			<div class="row">
+				<button id="close-similar">Close</button>
+			</div>
+		</div>
+	</div>
 	<script type="module" src="sidebar.js"></script>
 </body>
 </html>

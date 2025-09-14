@@ -70,6 +70,17 @@ const btnCopyAll = document.getElementById('btn-copy-all');
 const btnJudge = document.getElementById('btn-judge');
 const btnAudio = document.getElementById('btn-audio');
 const draftModal = document.getElementById('draft-modal');
+const similarModal = document.getElementById('similar-modal');
+const lensList = document.getElementById('lens-list');
+const lensGraph = document.getElementById('lens-graph');
+const refreshLens = document.getElementById('refresh-lens');
+const filterOA = document.getElementById('filter-oa');
+const filterRecent = document.getElementById('filter-recent');
+const lensPagination = document.getElementById('lens-pagination');
+const lensPrev = document.getElementById('lens-prev');
+const lensNext = document.getElementById('lens-next');
+const lensPageInfo = document.getElementById('lens-page-info');
+const closeSimilar = document.getElementById('close-similar');
 const btnGenDraft = document.getElementById('btn-generate-draft');
 const btnCloseDraft = document.getElementById('btn-close-draft');
 const draftOutput = document.getElementById('draft-output');
@@ -77,7 +88,7 @@ const citeStyleSel = document.getElementById('cite-style');
 const btnCopyDraft = document.getElementById('btn-copy-draft');
 const btnExportDraftMd = document.getElementById('btn-export-draft-md');
 import { writeDraftFromCards } from './ai/writer.js';
-import { fetchMetadata } from './lib/academic.js';
+import { fetchMetadata, resolveOpenAlex, getReferences, getCitedBy, scoreSimilar } from './lib/academic.js';
 import { formatAPA, formatMLA, formatHarvard, formatBibTeX } from './lib/citations.js';
 import { getApiKey } from './lib/settings.js';
 import { promptMultimodal } from './ai/prompt.js';
@@ -127,6 +138,7 @@ function renderCard(card) {
 				</div>
 				<div class="menu" data-menu="more">
 					<button data-more="move">Move to… ▸</button>
+					<button data-more="similar">Find similar</button>
 					<button data-more="delete">Delete</button>
 					<button data-more="restore">Restore</button>
 				</div>
@@ -193,6 +205,15 @@ function renderCard(card) {
 	const restoreBtn = menuMore.querySelector('[data-more="restore"]');
 	restoreBtn.style.display = showTrash ? '' : 'none';
 	restoreBtn.addEventListener('click', async () => { await dbRestoreCard(card.id); });
+	menuMore.querySelector('[data-more="similar"]').addEventListener('click', async () => {
+		similarModal.style.display = 'flex';
+		lensList.textContent = 'Searching…';
+		try {
+			const key = await getApiKey();
+			if (!key) { lensList.textContent = 'Enable Hybrid and set an API key in Options.'; return; }
+			await openLiteratureLens(card);
+		} catch { lensList.textContent = 'Search failed.'; }
+	});
 	menuMore.querySelector('[data-more="move"]').addEventListener('click', async (e) => {
 		e.stopPropagation();
 		// Cache rects BEFORE awaiting
@@ -503,5 +524,189 @@ function showToast(text) {
     if (!el) { el = document.createElement('div'); el.id = 'toast'; el.style.position = 'fixed'; el.style.bottom = '16px'; el.style.right = '16px'; el.style.background = '#101522'; el.style.border = '1px solid #2a3142'; el.style.color = '#e6e6e6'; el.style.borderRadius = '8px'; el.style.padding = '8px 12px'; el.style.zIndex = '9999'; document.body.appendChild(el); }
     el.textContent = text; el.style.opacity = '1'; clearTimeout(showToast._t); showToast._t = setTimeout(() => { el.style.opacity = '0'; }, 1500);
 }
+
+function renderSimilar(items = []) {
+    if (!Array.isArray(items) || items.length === 0) { lensList.textContent = 'No results.'; return; }
+    lensList.innerHTML = items.map((m, i) => `
+        <div style="display:flex; gap:8px; align-items:center; margin:8px 0;">
+            <div style="flex:1;">
+                <div style="font-weight:600;">${escapeHtml(m.title || 'Untitled')}</div>
+                <div style="opacity:0.8; font-size:12px;">${escapeHtml((m.venue || '') + (m.year ? ' · ' + m.year : ''))}</div>
+            </div>
+            <button data-sim-act="open" data-url="${m.url || (m.doi ? 'https://doi.org/' + m.doi : '')}">Open</button>
+            <button data-sim-act="add" data-title="${escapeHtml(m.title || '')}" data-url="${m.url || ''}" data-doi="${m.doi || ''}">Add</button>
+            <button data-sim-act="cite" data-title="${escapeHtml(m.title || '')}" data-url="${m.url || ''}" data-doi="${m.doi || ''}">Cite</button>
+        </div>
+    `).join('');
+    // Wire actions
+    lensList.querySelectorAll('button[data-sim-act="open"]').forEach(b => b.addEventListener('click', () => {
+        const url = b.getAttribute('data-url');
+        if (url && url.startsWith('http')) chrome.tabs.create({ url });
+    }));
+    lensList.querySelectorAll('button[data-sim-act="add"]').forEach(b => b.addEventListener('click', async () => {
+        const title = b.getAttribute('data-title');
+        const url = b.getAttribute('data-url');
+        const doi = b.getAttribute('data-doi');
+        await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), projectId: currentProjectId, deletedAt: null, title, url, favicon: '', snippet: 'Added from Similar Papers', badges: [], tags: [], doi });
+        showToast('Added to project');
+    }));
+    lensList.querySelectorAll('button[data-sim-act="cite"]').forEach(b => b.addEventListener('click', async () => {
+        const meta = { title: b.getAttribute('data-title'), url: b.getAttribute('data-url'), doi: b.getAttribute('data-doi'), authors: [], year: '', venue: '' };
+        await navigator.clipboard.writeText(formatAPA(meta));
+        showToast('Copied citation');
+    }));
+}
+
+closeSimilar?.addEventListener('click', () => { similarModal.style.display = 'none'; });
+
+async function openLiteratureLens(card) {
+    // Cache by DOI or URL, TTL 7 days
+    const cacheKey = `lens_${card.doi || card.url}`;
+    chrome.storage.local.get([cacheKey], async (res) => {
+        const cached = res?.[cacheKey];
+        if (cached && (Date.now() - (cached.savedAt || 0)) < 7*24*60*60*1000) {
+            renderLens(card, cached.payload);
+            return;
+        }
+        // Resolve base work
+        const base = await resolveOpenAlex({ doi: card.doi, title: card.title }).catch(() => null);
+        if (!base?.openalex_id) { lensList.textContent = 'Could not resolve paper in OpenAlex.'; return; }
+        // Fetch refs and cited-by
+        const [refs, cited] = await Promise.all([
+            getReferences(base.openalex_id),
+            getCitedBy(base.openalex_id)
+        ]);
+        // Compute similar from union pool
+        const pool = [...refs, ...cited];
+        const similar = scoreSimilar(base, pool).slice(0, 30);
+        const payload = { base, refs, cited, similar };
+        chrome.storage.local.set({ [cacheKey]: { savedAt: Date.now(), payload } });
+        renderLens(card, payload);
+    });
+}
+
+// Capture last payload for tab switch re-renders
+function renderLens(card, payload) {
+    window.__lens_last_payload = payload;
+    window.__lens_current_page = 1;
+    window.__lens_page_size = 10;
+    
+    const tab = document.querySelector('[data-lens-tab].active')?.getAttribute('data-lens-tab') || 'similar';
+    const list = tab === 'refs' ? payload.refs : tab === 'cited' ? payload.cited : payload.similar;
+    
+    renderSimilarPaginated(list);
+    updatePagination(list.length);
+    
+    lensGraph.innerHTML = `<div style="display:flex; gap:8px; font-size:12px; opacity:0.8;">
+        <span>Refs: ${payload.refs.length}</span>
+        <span>Cited By: ${payload.cited.length}</span>
+        <span>Similar: ${payload.similar.length}</span>
+    </div>`;
+}
+
+function renderSimilarPaginated(items = []) {
+    if (!Array.isArray(items) || items.length === 0) { 
+        lensList.textContent = 'No results.'; 
+        lensPagination.style.display = 'none';
+        return; 
+    }
+    
+    const pageSize = window.__lens_page_size || 10;
+    const currentPage = window.__lens_current_page || 1;
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const pageItems = items.slice(startIndex, endIndex);
+    
+    lensList.innerHTML = pageItems.map((m, i) => `
+        <div style="display:flex; gap:8px; align-items:center; margin:8px 0;">
+            <div style="flex:1;">
+                <div style="font-weight:600;">${escapeHtml(m.title || 'Untitled')}</div>
+                <div style="opacity:0.8; font-size:12px;">${escapeHtml((m.venue || '') + (m.year ? ' · ' + m.year : ''))}</div>
+            </div>
+            <button data-sim-act="open" data-url="${m.url || (m.doi ? 'https://doi.org/' + m.doi : '')}">Open</button>
+            <button data-sim-act="add" data-title="${escapeHtml(m.title || '')}" data-url="${m.url || ''}" data-doi="${m.doi || ''}">Add</button>
+            <button data-sim-act="cite" data-title="${escapeHtml(m.title || '')}" data-url="${m.url || ''}" data-doi="${m.doi || ''}">Cite</button>
+        </div>
+    `).join('');
+    
+    // Wire actions
+    lensList.querySelectorAll('button[data-sim-act="open"]').forEach(b => b.addEventListener('click', () => {
+        const url = b.getAttribute('data-url');
+        if (url && url.startsWith('http')) chrome.tabs.create({ url });
+    }));
+    lensList.querySelectorAll('button[data-sim-act="add"]').forEach(b => b.addEventListener('click', async () => {
+        const title = b.getAttribute('data-title');
+        const url = b.getAttribute('data-url');
+        const doi = b.getAttribute('data-doi');
+        await dbAddCard({ id: crypto.randomUUID(), createdAt: Date.now(), projectId: currentProjectId, deletedAt: null, title, url, favicon: '', snippet: 'Added from Literature Lens', badges: [], tags: [], doi });
+        showToast('Added to project');
+    }));
+    lensList.querySelectorAll('button[data-sim-act="cite"]').forEach(b => b.addEventListener('click', async () => {
+        const meta = { title: b.getAttribute('data-title'), url: b.getAttribute('data-url'), doi: b.getAttribute('data-doi'), authors: [], year: '', venue: '' };
+        await navigator.clipboard.writeText(formatAPA(meta));
+        showToast('Copied citation');
+    }));
+}
+
+function updatePagination(totalItems) {
+    const pageSize = window.__lens_page_size || 10;
+    const currentPage = window.__lens_current_page || 1;
+    const totalPages = Math.ceil(totalItems / pageSize);
+    
+    if (totalPages <= 1) {
+        lensPagination.style.display = 'none';
+        return;
+    }
+    
+    lensPagination.style.display = 'flex';
+    lensPrev.disabled = currentPage <= 1;
+    lensNext.disabled = currentPage >= totalPages;
+    lensPageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+}
+
+// Pagination event listeners
+lensPrev?.addEventListener('click', () => {
+    if (window.__lens_current_page > 1) {
+        window.__lens_current_page--;
+        const last = window.__lens_last_payload;
+        if (last) {
+            const tab = document.querySelector('[data-lens-tab].active')?.getAttribute('data-lens-tab') || 'similar';
+            const list = tab === 'refs' ? last.refs : tab === 'cited' ? last.cited : last.similar;
+            renderSimilarPaginated(list);
+            updatePagination(list.length);
+        }
+    }
+});
+
+lensNext?.addEventListener('click', () => {
+    const last = window.__lens_last_payload;
+    if (last) {
+        const tab = document.querySelector('[data-lens-tab].active')?.getAttribute('data-lens-tab') || 'similar';
+        const list = tab === 'refs' ? last.refs : tab === 'cited' ? last.cited : last.similar;
+        const totalPages = Math.ceil(list.length / (window.__lens_page_size || 10));
+        if (window.__lens_current_page < totalPages) {
+            window.__lens_current_page++;
+            renderSimilarPaginated(list);
+            updatePagination(list.length);
+        }
+    }
+});
+
+// Lens tab switching
+document.querySelectorAll('[data-lens-tab]')?.forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-lens-tab]')?.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Re-render last payload if available
+        const last = window.__lens_last_payload;
+        if (last) {
+            window.__lens_current_page = 1; // Reset to page 1 when switching tabs
+            const tab = btn.getAttribute('data-lens-tab');
+            const list = tab === 'refs' ? last.refs : tab === 'cited' ? last.cited : last.similar;
+            renderSimilarPaginated(list);
+            updatePagination(list.length);
+        }
+    });
+});
 
 

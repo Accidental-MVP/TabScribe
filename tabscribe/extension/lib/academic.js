@@ -125,3 +125,101 @@ export async function findSimilar({ doi, title }, { provider = 'openalex', limit
 }
 
 
+// ===== Literature Lens helpers (OpenAlex-only, no auth required) =====
+
+export async function resolveOpenAlex({ doi, title }) {
+    let base = null;
+    if (doi) base = await fetchOpenAlexWork(`doi:${encodeURIComponent(doi)}`).catch(() => null);
+    if (!base && title) base = await searchOpenAlexByTitle(title).catch(() => null);
+    return base;
+}
+
+export async function getReferences(openalexId, limit = 20) {
+    const work = await fetchOpenAlexById(openalexId);
+    const ids = (work?.referenced_works || []).slice(0, limit);
+    return hydrateOpenAlexIds(ids);
+}
+
+export async function getCitedBy(openalexId, limit = 20) {
+    const res = await fetch(`${OPENALEX}/works?filter=cites:${openalexId}&per-page=${limit}&sort=year:desc,cited_by_count:desc`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data?.results || []).map(normalizeOpenAlexWorkRich);
+}
+
+export function scoreSimilar(center, candidates, nowYear = (new Date()).getFullYear()) {
+    const centerConcepts = new Set((center.concepts || []).map(c => c.id));
+    const centerTokens = buildTokens(center);
+    return candidates.map(c => {
+        const candConcepts = new Set((c.concepts || []).map(x => x.id));
+        const jacc = jaccard(centerConcepts, candConcepts);
+        const tf = termOverlap(centerTokens, buildTokens(c));
+        const freshness = c.year ? Math.max(0, Math.min(1, (c.year - (nowYear - 10)) / 10)) : 0;
+        const score = 0.6 * jacc + 0.4 * tf + 0.05 * freshness;
+        return { ...c, score };
+    }).sort((a, b) => b.score - a.score);
+}
+
+function buildTokens(w) {
+    const text = `${w.title || ''} ${(w.abstract || '')}`.toLowerCase();
+    return new Set(text.split(/[^a-z0-9]+/).filter(t => t && t.length > 3).slice(0, 200));
+}
+
+function termOverlap(aSet, bSet) {
+    if (!aSet.size || !bSet.size) return 0;
+    let inter = 0;
+    for (const t of aSet) if (bSet.has(t)) inter++;
+    return inter / Math.min(aSet.size, bSet.size);
+}
+
+function jaccard(a, b) {
+    if (!a.size && !b.size) return 0;
+    let inter = 0;
+    for (const x of a) if (b.has(x)) inter++;
+    return inter / (a.size + b.size - inter || 1);
+}
+
+async function fetchOpenAlexById(idOrUrl) {
+    const id = String(idOrUrl).split('/').pop();
+    const res = await fetch(`${OPENALEX}/works/${id}`);
+    if (!res.ok) throw new Error('openalex');
+    return await res.json();
+}
+
+async function fetchOpenAlexWork(path) {
+    const res = await fetch(`${OPENALEX}/works/${path}`);
+    if (!res.ok) throw new Error('openalex');
+    const w = await res.json();
+    return normalizeOpenAlexWorkRich(w);
+}
+
+async function hydrateOpenAlexIds(ids = []) {
+    const limited = ids.slice(0, 20);
+    const out = [];
+    for (const id of limited) {
+        try {
+            const w = await fetchOpenAlexById(id);
+            out.push(normalizeOpenAlexWorkRich(w));
+        } catch {}
+    }
+    return out;
+}
+
+function normalizeOpenAlexWorkRich(w) {
+    const base = normalizeOpenAlexWork(w);
+    return {
+        ...base,
+        cited_by_count: w?.cited_by_count,
+        concepts: (w?.concepts || []).map(c => ({ id: c.id, name: c.display_name })),
+        abstract: reconstructAbstract(w?.abstract_inverted_index)
+    };
+}
+
+function reconstructAbstract(inv) {
+    if (!inv) return '';
+    const arr = [];
+    for (const [word, positions] of Object.entries(inv)) {
+        positions.forEach(p => { arr[p] = word; });
+    }
+    return arr.join(' ');
+}
