@@ -20,7 +20,19 @@
     "https://api.crossref.org/*"
   ],
   "action": {
-    "default_title": "Open TabScribe"
+    "default_title": "Open TabScribe",
+    "default_icon": {
+      "16": "icons/icon.png",
+      "32": "icons/icon.png",
+      "48": "icons/icon.png",
+      "128": "icons/icon.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon.png",
+    "32": "icons/icon.png",
+    "48": "icons/icon.png",
+    "128": "icons/icon.png"
   },
   "background": {
     "service_worker": "service_worker.js",
