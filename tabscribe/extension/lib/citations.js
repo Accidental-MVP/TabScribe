@@ -14,19 +14,45 @@ export function detectDOI(textOrUrl) {
 }
 
 export function formatAPA(meta) {
-	// Very lightweight APA: Authors (Year). Title. Venue. DOI/URL
-	const authors = (meta.authors || []).map(a => `${a.last || a.family || a.name || ''}${a.first || a.given ? ', ' + (a.first || a.given)[0] + '.' : ''}`).join(', ');
+	// APA-like: Author, A. A., Author, B. B. (Year). Title. Venue. https://doi.org/xxx
+	const authors = (meta.authors || []).map(a => {
+		const family = a.family || a.last || a.full?.split(' ').slice(-1)[0] || '';
+		const givenInitials = (a.given || a.first || a.full?.split(' ').slice(0, -1).join(' ') || '')
+			.split(/\s+/).filter(Boolean).map(s => s[0]?.toUpperCase() + '.').join('');
+		return [family, givenInitials && (', ' + givenInitials)].filter(Boolean).join('');
+	}).join(', ');
 	const year = meta.year || (meta.issued?.['date-parts']?.[0]?.[0]) || '';
-	const parts = [authors, year ? `(${year}).` : '', meta.title ? `${meta.title}.` : '', meta.venue || meta.container || '', meta.doi ? `https://doi.org/${meta.doi}` : meta.url || ''].filter(Boolean);
-	return parts.join(' ');
+	const venue = meta.venue || meta.container || '';
+	const url = meta.doi ? `https://doi.org/${meta.doi}` : (meta.url || '');
+	return [authors, year ? `(${year}).` : '', meta.title ? `${meta.title}.` : '', venue ? `${venue}.` : '', url].filter(Boolean).join(' ');
 }
 
 export function formatMLA(meta) {
 	// Lightweight MLA: Authors. "Title." Venue, Year, URL/DOI
 	const authors = (meta.authors || []).map(a => a.full || [a.family || a.last, a.given || a.first].filter(Boolean).join(', ')).join(', ');
 	const year = meta.year || (meta.issued?.['date-parts']?.[0]?.[0]) || '';
-	const url = meta.doi ? `https://doi.org/${meta.doi}` : meta.url || '';
-	return [authors ? authors + '.', meta.title ? `"${meta.title}."` : '', meta.venue || meta.container || '', year, url].filter(Boolean).join(' ');
+	const venue = meta.venue || meta.container || '';
+	const url = meta.doi ? `https://doi.org/${meta.doi}` : (meta.url || '');
+	const parts = [];
+	if (authors) parts.push(authors + '.');
+	if (meta.title) parts.push(`"${meta.title}."`);
+	if (venue) parts.push(venue);
+	if (year) parts.push(String(year));
+	if (url) parts.push(url);
+	return parts.join(' ');
+}
+
+export function formatHarvard(meta) {
+	// Harvard-like: Author, A. A. (Year) Title. Venue. Available at: URL/DOI
+	const authors = (meta.authors || []).map(a => {
+		const family = a.family || a.last || a.full?.split(' ').slice(-1)[0] || '';
+		const given = a.given || a.first || a.full?.split(' ').slice(0, -1).join(' ') || '';
+		return [family, given && (', ' + given)].filter(Boolean).join('');
+	}).join(', ');
+	const year = meta.year || (meta.issued?.['date-parts']?.[0]?.[0]) || '';
+	const venue = meta.venue || meta.container || '';
+	const url = meta.doi ? `https://doi.org/${meta.doi}` : (meta.url || '');
+	return [authors, year ? `(${year})` : '', meta.title ? meta.title + '.' : '', venue ? venue + '.' : '', url ? `Available at: ${url}` : ''].filter(Boolean).join(' ');
 }
 
 export function formatBibTeX(meta) {

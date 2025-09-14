@@ -71,6 +71,8 @@ const citeStyleSel = document.getElementById('cite-style');
 const btnCopyDraft = document.getElementById('btn-copy-draft');
 const btnExportDraftMd = document.getElementById('btn-export-draft-md');
 import { writeDraftFromCards } from './ai/writer.js';
+import { fetchMetadata } from './lib/academic.js';
+import { formatAPA, formatMLA, formatHarvard, formatBibTeX } from './lib/citations.js';
 import { promptMultimodal } from './ai/prompt.js';
 const dropzone = document.getElementById('dropzone');
 const onboarding = document.getElementById('onboarding');
@@ -112,6 +114,7 @@ function renderCard(card) {
 					<button data-cite="bibtex">Copy BibTeX</button>
 					<button data-cite="apa">Copy APA</button>
 					<button data-cite="mla">Copy MLA</button>
+					<button data-cite="harvard">Copy Harvard</button>
 				</div>
 				<div class="menu" data-menu="more">
 					<button data-more="move">Move to… ▸</button>
@@ -205,18 +208,22 @@ function renderCard(card) {
 		toggleMenu(menuMove, true);
 	});
 
-	menuCite.querySelector('[data-cite="bibtex"]').addEventListener('click', async () => {
-		const meta = { title: card.title, url: card.url, authors: [], year: '', venue: '', doi: card.doi };
-		await navigator.clipboard.writeText('@article{ref, title={' + (meta.title||'') + '}, url={' + (meta.url||'') + '}}');
-	});
-	menuCite.querySelector('[data-cite="apa"]').addEventListener('click', async () => {
-		const meta = { title: card.title, url: card.url };
-		await navigator.clipboard.writeText(`${meta.title}. ${meta.url}`);
-	});
-	menuCite.querySelector('[data-cite="mla"]').addEventListener('click', async () => {
-		const meta = { title: card.title, url: card.url };
-		await navigator.clipboard.writeText(`${meta.title}. ${meta.url}`);
-	});
+	async function copyCitation(style) {
+		let meta = { title: card.title, url: card.url, doi: card.doi, authors: [], year: '', venue: '' };
+		try { const fetched = await fetchMetadata({ doi: card.doi, title: card.title }); if (fetched) meta = { ...meta, ...fetched }; } catch {}
+		let txt = '';
+		if (style === 'bibtex') txt = formatBibTeX(meta);
+		else if (style === 'apa') txt = formatAPA(meta);
+		else if (style === 'mla') txt = formatMLA(meta);
+		else if (style === 'harvard') txt = formatHarvard(meta);
+		else txt = formatAPA(meta);
+		await navigator.clipboard.writeText(txt);
+		try { showToast?.(`Copied ${style.toUpperCase()} citation`); } catch {}
+	}
+	menuCite.querySelector('[data-cite="bibtex"]').addEventListener('click', () => copyCitation('bibtex'));
+	menuCite.querySelector('[data-cite="apa"]').addEventListener('click', () => copyCitation('apa'));
+	menuCite.querySelector('[data-cite="mla"]').addEventListener('click', () => copyCitation('mla'));
+	menuCite.querySelector('[data-cite="harvard"]').addEventListener('click', () => copyCitation('harvard'));
 	return el;
 }
 
@@ -312,8 +319,35 @@ btnDraft.addEventListener('click', () => { draftModal.style.display = 'flex'; })
 btnCloseDraft.addEventListener('click', () => draftModal.style.display = 'none');
 btnGenDraft.addEventListener('click', async () => {
     const cards = allCardsCache.filter(c => c.projectId === currentProjectId && !c.deletedAt);
-    const draft = await writeDraftFromCards(cards, { tone: 'neutral', length: 'medium' });
-    draftOutput.value = draft;
+    const style = citeStyleSel?.value || 'APA';
+    // Prepare metadata for each card (Hybrid only fetches real metadata; otherwise fallback minimal)
+    const metas = [];
+    for (const c of cards) {
+        let meta = { title: c.title, url: c.url, doi: c.doi, authors: [], year: '', venue: '' };
+        try {
+            const fetched = await fetchMetadata({ doi: c.doi, title: c.title });
+            if (fetched) meta = { ...meta, ...fetched };
+        } catch {}
+        metas.push(meta);
+    }
+
+    // Build references by selected style
+    const fmt = (m) => {
+        if (style === 'APA') return formatAPA(m);
+        if (style === 'MLA') return formatMLA(m);
+        if (style === 'Harvard') return formatHarvard(m);
+        if (style === 'BibTeX') return formatBibTeX(m);
+        return formatAPA(m);
+    };
+    const refs = metas.map((m, i) => `[${i+1}] ${fmt(m)}`).join('\n');
+
+    // Ask Writer to compose using inline numeric citations
+    const bullets = cards.map(c => c.snippet.split(/[.!?]/)[0]).slice(0, 12).join('\n- ');
+    const prompt = `Write a concise research draft with:\n- Intro (1 short paragraph)\n- Key Points as bullets\n- Open Questions\n- References section using the numeric mapping below\n\nKey Points:\n- ${bullets}\n\nMapping (keep [n] inline):\n${refs}`;
+    const draft = await writeDraftFromCards(cards, { tone: 'neutral', length: 'medium', promptOverride: prompt });
+    // If Writer fallback used raw cards, append references explicitly
+    const finalDraft = draft.includes('## Sources') || draft.includes('## References') ? draft : `${draft}\n\n## References\n${refs}`;
+    draftOutput.value = finalDraft;
 });
 btnCopyDraft.addEventListener('click', async () => { await navigator.clipboard.writeText(draftOutput.value || ''); });
 btnExportDraftMd.addEventListener('click', async () => {
@@ -325,6 +359,7 @@ btnExportDraftMd.addEventListener('click', async () => {
 
 btnExportMd.addEventListener('click', async () => {
     const cards = allCardsCache.filter(c => c.projectId === currentProjectId && !c.deletedAt);
+    // Inline numeric refs; basic export keeps [n] markers
     const md = exportMarkdown(cards, true);
     const blob = new Blob([md], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
