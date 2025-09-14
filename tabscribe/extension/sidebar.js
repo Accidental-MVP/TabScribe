@@ -154,7 +154,19 @@ function renderCard(card) {
 		toggleMenu(menuCite, menuCite.style.display !== 'block');
 	});
 
-	document.addEventListener('click', () => { toggleMenu(menuMore, false); toggleMenu(menuCite, false); toggleMenu(menuMove, false); }, { once: true });
+	(function setupOutsideClose(){
+		const handler = (ev) => {
+			const t = ev.target;
+			const clickedInsideMenus = menuMore.contains(t) || menuCite.contains(t) || menuMove.contains(t);
+			const clickedOnToggles = !!(t.closest('[data-act="more"]') || t.closest('[data-act="cite"]'));
+			if (!clickedInsideMenus && !clickedOnToggles) {
+				toggleMenu(menuMore, false);
+				toggleMenu(menuCite, false);
+				toggleMenu(menuMove, false);
+			}
+		};
+		document.addEventListener('click', handler);
+	})();
 
 	menuMore.querySelector('[data-more="delete"]').addEventListener('click', async () => {
 		if (showTrash) {
