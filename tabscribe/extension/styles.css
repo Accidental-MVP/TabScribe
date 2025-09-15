@@ -519,6 +519,8 @@ button:hover {
 
 #btn-sample:hover {
 	background: #2d364a;
+	border-color: var(--brand);
+	transform: translateY(-1px);
 }
 
 .row-controls {
