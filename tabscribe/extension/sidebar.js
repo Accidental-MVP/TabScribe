@@ -564,7 +564,13 @@ searchInput.addEventListener('input', () => render());
 render();
 loadMode();
 loadProjects();
-initOnboarding();
+
+// Wait for DOM to be fully ready before initializing onboarding
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initOnboarding);
+} else {
+    initOnboarding();
+}
 
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === 'tabscribe:card_added') { render(); }
@@ -589,10 +595,63 @@ async function fileToDataUrl(file) {
     return new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file); });
 }
 
+// Global function for onclick handler
+window.dismissOnboarding = function() {
+    console.log('Dismiss button clicked via onclick!');
+    const onboarding = document.getElementById('onboarding');
+    if (onboarding) {
+        onboarding.style.display = 'none';
+        chrome.storage.local.set({ 'tabscribe_onboarding_dismissed': true });
+    }
+};
+
 function initOnboarding() {
     const key = 'tabscribe_onboarding_dismissed';
-    chrome.storage.local.get([key], (res) => { if (!res[key]) onboarding.style.display = 'block'; });
-    dismissOnboarding?.addEventListener('click', () => { onboarding.style.display = 'none'; chrome.storage.local.set({ 'tabscribe_onboarding_dismissed': true }); });
+    chrome.storage.local.get([key], (res) => { 
+        if (!res[key]) {
+            onboarding.style.display = 'block';
+        }
+    });
+    
+    // Wait for DOM to be ready and try multiple times
+    const attachDismissListener = () => {
+        const dismissBtn = document.getElementById('dismiss-onboarding');
+        console.log('Looking for dismiss button:', dismissBtn);
+        
+        if (dismissBtn) {
+            console.log('Found dismiss button, attaching listener');
+            dismissBtn.addEventListener('click', (e) => {
+                console.log('Dismiss button clicked!');
+                e.preventDefault();
+                e.stopPropagation();
+                onboarding.style.display = 'none';
+                chrome.storage.local.set({ 'tabscribe_onboarding_dismissed': true });
+            });
+            return true;
+        }
+        return false;
+    };
+    
+    // Try immediately
+    if (!attachDismissListener()) {
+        // If not found, try again after a short delay
+        setTimeout(() => {
+            if (!attachDismissListener()) {
+                console.error('Dismiss button still not found after delay');
+            }
+        }, 100);
+    }
+    
+    // Also use event delegation as backup
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'dismiss-onboarding') {
+            console.log('Dismiss button clicked via delegation!');
+            e.preventDefault();
+            e.stopPropagation();
+            onboarding.style.display = 'none';
+            chrome.storage.local.set({ 'tabscribe_onboarding_dismissed': true });
+        }
+    });
 }
 
 btnJudge?.addEventListener('click', () => { chrome.tabs.create({ url: chrome.runtime.getURL('judge.html') }); });
