@@ -15,6 +15,15 @@ const btnTrash = document.getElementById('btn-trash');
 const btnPurge = document.getElementById('btn-purge');
 const btnOpenAll = document.getElementById('btn-open-all');
 const searchInput = document.getElementById('search');
+const newProjectForm = document.getElementById('new-project-form');
+const newProjectName = document.getElementById('new-project-name');
+const btnCreateProject = document.getElementById('btn-create-project');
+const btnCancelProject = document.getElementById('btn-cancel-project');
+const btnDeleteProject = document.getElementById('btn-delete-project');
+const deleteProjectConfirm = document.getElementById('delete-project-confirm');
+const deleteProjectName = document.getElementById('delete-project-name');
+const btnConfirmDelete = document.getElementById('btn-confirm-delete');
+const btnCancelDelete = document.getElementById('btn-cancel-delete');
 
 let currentProjectId = 'default';
 let showTrash = false;
@@ -41,6 +50,18 @@ async function loadProjects() {
         opt.value = p.id; opt.textContent = p.name;
         if (p.id === currentProjectId) opt.selected = true;
         projectSelect.appendChild(opt);
+    }
+    
+    // Show/hide delete button based on selected project
+    updateDeleteButtonVisibility();
+}
+
+function updateDeleteButtonVisibility() {
+    const selectedProject = projectSelect.options[projectSelect.selectedIndex];
+    if (selectedProject && selectedProject.value !== 'default') {
+        btnDeleteProject.style.display = '';
+    } else {
+        btnDeleteProject.style.display = 'none';
     }
 }
 
@@ -429,16 +450,90 @@ btnCopyAll.addEventListener('click', async () => {
 projectSelect.addEventListener('change', async () => {
 	currentProjectId = projectSelect.value;
 	try { chrome.storage.local.set({ 'tabscribe_current_project': currentProjectId }); } catch {}
+	updateDeleteButtonVisibility();
 	render();
 });
-btnNewProject.addEventListener('click', async () => {
-	const name = prompt('Project name');
+btnNewProject.addEventListener('click', () => {
+	newProjectForm.style.display = 'block';
+	newProjectName.focus();
+});
+
+btnCreateProject.addEventListener('click', async () => {
+	const name = newProjectName.value.trim();
 	if (!name) return;
+	
 	const id = `p_${Date.now()}`;
 	await dbAddProject({ id, name });
 	currentProjectId = id;
 	await loadProjects();
+	
+	// Hide form and clear input
+	newProjectForm.style.display = 'none';
+	newProjectName.value = '';
+	
 	render();
+});
+
+btnCancelProject.addEventListener('click', () => {
+	newProjectForm.style.display = 'none';
+	newProjectName.value = '';
+});
+
+// Handle Enter key in project name input
+newProjectName.addEventListener('keypress', (e) => {
+	if (e.key === 'Enter') {
+		btnCreateProject.click();
+	}
+});
+
+// Project deletion functionality
+btnDeleteProject.addEventListener('click', () => {
+	const selectedProject = projectSelect.options[projectSelect.selectedIndex];
+	if (!selectedProject) return;
+	
+	// Don't allow deletion of default project
+	if (selectedProject.value === 'default') {
+		showToast('Cannot delete the default project');
+		return;
+	}
+	
+	deleteProjectName.textContent = selectedProject.textContent;
+	deleteProjectConfirm.style.display = 'block';
+});
+
+btnConfirmDelete.addEventListener('click', async () => {
+	const selectedProject = projectSelect.options[projectSelect.selectedIndex];
+	if (!selectedProject) return;
+	
+	const projectId = selectedProject.value;
+	
+	try {
+		// Delete all cards in this project first
+		const cards = await dbGetCardsByProject(projectId);
+		for (const card of cards) {
+			await dbDeleteCard(card.id);
+		}
+		
+		// Delete the project
+		await dbDeleteProject(projectId);
+		
+		// Switch to default project
+		currentProjectId = 'default';
+		await loadProjects();
+		
+		// Hide confirmation and show success
+		deleteProjectConfirm.style.display = 'none';
+		showToast(`Project "${selectedProject.textContent}" deleted`);
+		
+		render();
+	} catch (error) {
+		console.error('Error deleting project:', error);
+		showToast('Error deleting project');
+	}
+});
+
+btnCancelDelete.addEventListener('click', () => {
+	deleteProjectConfirm.style.display = 'none';
 });
 btnTrash.addEventListener('click', () => { 
     showTrash = !showTrash; 
