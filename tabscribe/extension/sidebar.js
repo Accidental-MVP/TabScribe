@@ -80,6 +80,10 @@ const lensPagination = document.getElementById('lens-pagination');
 const lensPrev = document.getElementById('lens-prev');
 const lensNext = document.getElementById('lens-next');
 const lensPageInfo = document.getElementById('lens-page-info');
+const graphMaximize = document.getElementById('graph-maximize');
+const graphReset = document.getElementById('graph-reset');
+const graphToggleLabels = document.getElementById('graph-toggle-labels');
+const graphStats = document.getElementById('graph-stats');
 const closeSimilar = document.getElementById('close-similar');
 const btnGenDraft = document.getElementById('btn-generate-draft');
 const btnCloseDraft = document.getElementById('btn-close-draft');
@@ -585,6 +589,255 @@ async function openLiteratureLens(card) {
     });
 }
 
+// Lightweight D3-like implementation for Chrome extensions
+class MiniD3 {
+    constructor(container) {
+        this.container = container;
+        this.svg = null;
+        this.width = 0;
+        this.height = 0;
+        this.transform = { x: 0, y: 0, k: 1 };
+        this.isMaximized = false;
+        this.showLabels = true;
+    }
+    
+    select(selector) {
+        return new MiniD3Selection(this.container.querySelector(selector));
+    }
+    
+    createSVG(width, height) {
+        this.width = width;
+        this.height = height;
+        this.container.innerHTML = '';
+        
+        this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        this.svg.setAttribute('width', width);
+        this.svg.setAttribute('height', height);
+        this.svg.style.background = '#1a1d29';
+        this.svg.style.borderRadius = '8px';
+        this.svg.style.cursor = 'grab';
+        
+        // Add zoom/pan functionality
+        this.setupZoomPan();
+        
+        this.container.appendChild(this.svg);
+        return new MiniD3Selection(this.svg);
+    }
+    
+    setupZoomPan() {
+        let isDragging = false;
+        let startX, startY;
+        
+        this.svg.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'circle') return; // Don't pan when clicking nodes
+            isDragging = true;
+            startX = e.clientX - this.transform.x;
+            startY = e.clientY - this.transform.y;
+            this.svg.style.cursor = 'grabbing';
+        });
+        
+        this.svg.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            this.transform.x = e.clientX - startX;
+            this.transform.y = e.clientY - startY;
+            this.updateTransform();
+        });
+        
+        this.svg.addEventListener('mouseup', () => {
+            isDragging = false;
+            this.svg.style.cursor = 'grab';
+        });
+        
+        this.svg.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = this.svg.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            const newK = Math.max(0.1, Math.min(3, this.transform.k * scaleFactor));
+            
+            this.transform.x = mouseX - (mouseX - this.transform.x) * (newK / this.transform.k);
+            this.transform.y = mouseY - (mouseY - this.transform.y) * (newK / this.transform.k);
+            this.transform.k = newK;
+            
+            this.updateTransform();
+        });
+    }
+    
+    updateTransform() {
+        const g = this.svg.querySelector('g.zoom-group');
+        if (g) {
+            g.setAttribute('transform', `translate(${this.transform.x}, ${this.transform.y}) scale(${this.transform.k})`);
+        }
+    }
+    
+    resetZoom() {
+        this.transform = { x: 0, y: 0, k: 1 };
+        this.updateTransform();
+    }
+    
+    maximize() {
+        this.isMaximized = !this.isMaximized;
+        if (this.isMaximized) {
+            this.container.style.position = 'fixed';
+            this.container.style.top = '0';
+            this.container.style.left = '0';
+            this.container.style.width = '100vw';
+            this.container.style.height = '100vh';
+            this.container.style.zIndex = '10000';
+            this.container.style.background = '#0f1419';
+            this.svg.setAttribute('width', window.innerWidth);
+            this.svg.setAttribute('height', window.innerHeight);
+            this.width = window.innerWidth;
+            this.height = window.innerHeight;
+        } else {
+            this.container.style.position = 'relative';
+            this.container.style.top = '';
+            this.container.style.left = '';
+            this.container.style.width = '';
+            this.container.style.height = '280px';
+            this.container.style.zIndex = '';
+            this.container.style.background = '';
+            this.svg.setAttribute('width', 500);
+            this.svg.setAttribute('height', 280);
+            this.width = 500;
+            this.height = 280;
+        }
+        this.resetZoom();
+    }
+    
+    toggleLabels() {
+        this.showLabels = !this.showLabels;
+        const labels = this.svg.querySelectorAll('.node-label');
+        labels.forEach(label => {
+            label.style.display = this.showLabels ? 'block' : 'none';
+        });
+    }
+}
+
+class MiniD3Selection {
+    constructor(element) {
+        this.element = element;
+    }
+    
+    append(tagName) {
+        const element = document.createElementNS('http://www.w3.org/2000/svg', tagName);
+        this.element.appendChild(element);
+        return new MiniD3Selection(element);
+    }
+    
+    attr(name, value) {
+        if (value !== undefined) {
+            this.element.setAttribute(name, value);
+            return this;
+        }
+        return this.element.getAttribute(name);
+    }
+    
+    style(name, value) {
+        if (value !== undefined) {
+            this.element.style[name] = value;
+            return this;
+        }
+        return this.element.style[name];
+    }
+    
+    text(content) {
+        if (content !== undefined) {
+            this.element.textContent = content;
+            return this;
+        }
+        return this.element.textContent;
+    }
+    
+    on(event, handler) {
+        this.element.addEventListener(event, handler);
+        return this;
+    }
+    
+    selectAll(selector) {
+        const elements = this.element.querySelectorAll(selector);
+        return new MiniD3SelectionAll(Array.from(elements));
+    }
+    
+    data(dataArray) {
+        return new MiniD3DataSelection(this.element, dataArray);
+    }
+}
+
+class MiniD3SelectionAll {
+    constructor(elements) {
+        this.elements = elements;
+    }
+    
+    data(dataArray) {
+        return new MiniD3DataSelectionAll(this.elements, dataArray);
+    }
+}
+
+class MiniD3DataSelection {
+    constructor(element, dataArray) {
+        this.element = element;
+        this.dataArray = dataArray;
+    }
+    
+    enter() {
+        return new MiniD3EnterSelection(this.element, this.dataArray);
+    }
+}
+
+class MiniD3DataSelectionAll {
+    constructor(elements, dataArray) {
+        this.elements = elements;
+        this.dataArray = dataArray;
+    }
+    
+    enter() {
+        return new MiniD3EnterSelectionAll(this.elements, this.dataArray);
+    }
+}
+
+class MiniD3EnterSelection {
+    constructor(element, dataArray) {
+        this.element = element;
+        this.dataArray = dataArray;
+    }
+    
+    append(tagName) {
+        const elements = this.dataArray.map(() => {
+            const el = document.createElementNS('http://www.w3.org/2000/svg', tagName);
+            this.element.appendChild(el);
+            return el;
+        });
+        return new MiniD3SelectionAll(elements);
+    }
+}
+
+class MiniD3EnterSelectionAll {
+    constructor(elements, dataArray) {
+        this.elements = elements;
+        this.dataArray = dataArray;
+    }
+    
+    append(tagName) {
+        const newElements = this.dataArray.map(() => {
+            const el = document.createElementNS('http://www.w3.org/2000/svg', tagName);
+            // Append to the first element's parent
+            if (this.elements.length > 0) {
+                this.elements[0].parentNode.appendChild(el);
+            }
+            return el;
+        });
+        return new MiniD3SelectionAll(newElements);
+    }
+}
+
+// Global d3-like object
+window.d3 = {
+    select: (selector) => new MiniD3Selection(document.querySelector(selector))
+};
+
 // Capture last payload for tab switch re-renders
 function renderLens(card, payload) {
     window.__lens_last_payload = payload;
@@ -597,12 +850,266 @@ function renderLens(card, payload) {
     renderSimilarPaginated(list);
     updatePagination(list.length);
     
-    lensGraph.innerHTML = `<div style="display:flex; gap:8px; font-size:12px; opacity:0.8;">
-        <span>Refs: ${payload.refs.length}</span>
-        <span>Cited By: ${payload.cited.length}</span>
-        <span>Similar: ${payload.similar.length}</span>
-    </div>`;
+    // Render D3 graph
+    renderLiteratureGraph(payload);
 }
+
+function renderLiteratureGraph(payload) {
+    const miniD3 = new MiniD3(lensGraph);
+    const svg = miniD3.createSVG(450, 250); // Adjusted for modal constraints
+    
+    // Create zoom group
+    const g = svg.append('g').attr('class', 'zoom-group');
+    
+    const centerX = 225; // Centered in adjusted space
+    const centerY = 125;
+    
+    // Update stats
+    graphStats.textContent = `${payload.refs.length} refs • ${payload.cited.length} cited • ${payload.similar.length} similar`;
+    
+    // Center node (current paper) - much larger and more prominent
+    const centerNode = g.append('circle')
+        .attr('cx', centerX)
+        .attr('cy', centerY)
+        .attr('r', 20)
+        .attr('fill', '#22d3ee')
+        .attr('stroke', '#1f2937')
+        .attr('stroke-width', 3)
+        .attr('title', payload.base?.title || 'Current Paper')
+        .style('cursor', 'pointer');
+    
+    // Add center node text with better styling
+    g.append('text')
+        .attr('x', centerX)
+        .attr('y', centerY + 6)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '12px')
+        .attr('font-weight', 'bold')
+        .attr('fill', '#fff')
+        .text('CURRENT');
+    
+    // Add center node subtitle
+    g.append('text')
+        .attr('x', centerX)
+        .attr('y', centerY + 20)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '8px')
+        .attr('fill', '#9ca3af')
+        .text(payload.base?.title?.substring(0, 30) + (payload.base?.title?.length > 30 ? '...' : '') || 'Paper');
+    
+    // Reference nodes (inner ring) - more nodes, better spacing
+    const refNodes = payload.refs.slice(0, 14).map((ref, i) => {
+        const angle = (i / Math.min(payload.refs.length, 14)) * 2 * Math.PI;
+        const radius = 55;
+        return {
+            x: centerX + Math.cos(angle) * radius,
+            y: centerY + Math.sin(angle) * radius,
+            data: ref,
+            angle: angle,
+            index: i
+        };
+    });
+    
+    // Cited-by nodes (outer ring) - more nodes, better spacing
+    const citedNodes = payload.cited.slice(0, 20).map((cited, i) => {
+        const angle = (i / Math.min(payload.cited.length, 20)) * 2 * Math.PI;
+        const radius = 90;
+        return {
+            x: centerX + Math.cos(angle) * radius,
+            y: centerY + Math.sin(angle) * radius,
+            data: cited,
+            angle: angle,
+            index: i
+        };
+    });
+    
+    // Draw links for references with better styling
+    refNodes.forEach(node => {
+        g.append('line')
+            .attr('x1', centerX)
+            .attr('y1', centerY)
+            .attr('x2', node.x)
+            .attr('y2', node.y)
+            .attr('stroke', '#5eead4')
+            .attr('stroke-width', 1.5)
+            .attr('opacity', 0.7);
+    });
+    
+    // Draw links for cited-by with better styling
+    citedNodes.forEach(node => {
+        g.append('line')
+            .attr('x1', centerX)
+            .attr('y1', centerY)
+            .attr('x2', node.x)
+            .attr('y2', node.y)
+            .attr('stroke', '#fbbf24')
+            .attr('stroke-width', 1.5)
+            .attr('opacity', 0.7);
+    });
+    
+    // Draw reference nodes with labels
+    refNodes.forEach(node => {
+        const group = g.append('g').attr('class', 'ref-node');
+        
+        const circle = group.append('circle')
+            .attr('cx', node.x)
+            .attr('cy', node.y)
+            .attr('r', 6)
+            .attr('fill', '#5eead4')
+            .attr('stroke', '#1f2937')
+            .attr('stroke-width', 1.5)
+            .attr('title', node.data?.title || 'Reference')
+            .style('cursor', 'pointer');
+        
+        // Add label
+        const label = group.append('text')
+            .attr('class', 'node-label')
+            .attr('x', node.x)
+            .attr('y', node.y - 10)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '8px')
+            .attr('fill', '#5eead4')
+            .attr('font-weight', 'bold')
+            .text(`R${node.index + 1}`);
+        
+        // Add hover effects
+        circle.on('mouseenter', function() {
+            this.setAttribute('r', 8);
+            this.setAttribute('fill', '#7dd3fc');
+            label.attr('font-size', '10px');
+        });
+        
+        circle.on('mouseleave', function() {
+            this.setAttribute('r', 6);
+            this.setAttribute('fill', '#5eead4');
+            label.attr('font-size', '8px');
+        });
+        
+        circle.on('click', () => {
+            if (node.data) {
+                dbAddCard({
+                    id: crypto.randomUUID(),
+                    createdAt: Date.now(),
+                    projectId: currentProjectId,
+                    deletedAt: null,
+                    title: node.data.title || '',
+                    url: node.data.url || '',
+                    favicon: '',
+                    snippet: 'Added from Literature Lens (reference)',
+                    badges: [],
+                    tags: [],
+                    doi: node.data.doi || ''
+                });
+                showToast(`Added ${node.data.title || 'reference'} to project`);
+            }
+        });
+    });
+    
+    // Draw cited-by nodes with labels
+    citedNodes.forEach(node => {
+        const group = g.append('g').attr('class', 'cited-node');
+        
+        const circle = group.append('circle')
+            .attr('cx', node.x)
+            .attr('cy', node.y)
+            .attr('r', 5)
+            .attr('fill', '#fbbf24')
+            .attr('stroke', '#1f2937')
+            .attr('stroke-width', 1.5)
+            .attr('title', node.data?.title || 'Citation')
+            .style('cursor', 'pointer');
+        
+        // Add label
+        const label = group.append('text')
+            .attr('class', 'node-label')
+            .attr('x', node.x)
+            .attr('y', node.y - 8)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '7px')
+            .attr('fill', '#fbbf24')
+            .attr('font-weight', 'bold')
+            .text(`C${node.index + 1}`);
+        
+        // Add hover effects
+        circle.on('mouseenter', function() {
+            this.setAttribute('r', 7);
+            this.setAttribute('fill', '#fcd34d');
+            label.attr('font-size', '9px');
+        });
+        
+        circle.on('mouseleave', function() {
+            this.setAttribute('r', 5);
+            this.setAttribute('fill', '#fbbf24');
+            label.attr('font-size', '7px');
+        });
+        
+        circle.on('click', () => {
+            if (node.data) {
+                dbAddCard({
+                    id: crypto.randomUUID(),
+                    createdAt: Date.now(),
+                    projectId: currentProjectId,
+                    deletedAt: null,
+                    title: node.data.title || '',
+                    url: node.data.url || '',
+                    favicon: '',
+                    snippet: 'Added from Literature Lens (cited)',
+                    badges: [],
+                    tags: [],
+                    doi: node.data.doi || ''
+                });
+                showToast(`Added ${node.data.title || 'citation'} to project`);
+            }
+        });
+    });
+    
+    // Enhanced legend with better positioning
+    const legendItems = [
+        { color: '#22d3ee', label: 'Current Paper', x: 15, y: 230 },
+        { color: '#5eead4', label: `References (${payload.refs.length})`, x: 130, y: 230 },
+        { color: '#fbbf24', label: `Cited By (${payload.cited.length})`, x: 280, y: 230 }
+    ];
+    
+    legendItems.forEach(item => {
+        g.append('circle')
+            .attr('cx', item.x)
+            .attr('cy', item.y)
+            .attr('r', 5)
+            .attr('fill', item.color);
+        
+        g.append('text')
+            .attr('x', item.x + 8)
+            .attr('y', item.y + 3)
+            .attr('font-size', '11px')
+            .attr('fill', '#9ca3af')
+            .text(item.label);
+    });
+    
+    // Store reference for controls
+    window.__miniD3 = miniD3;
+}
+
+// Graph control event listeners
+graphMaximize?.addEventListener('click', () => {
+    if (window.__miniD3) {
+        window.__miniD3.maximize();
+        graphMaximize.textContent = window.__miniD3.isMaximized ? '⊡' : '⛶';
+    }
+});
+
+graphReset?.addEventListener('click', () => {
+    if (window.__miniD3) {
+        window.__miniD3.resetZoom();
+    }
+});
+
+graphToggleLabels?.addEventListener('click', () => {
+    if (window.__miniD3) {
+        window.__miniD3.toggleLabels();
+        graphToggleLabels.textContent = window.__miniD3.showLabels ? '🏷️' : '🏷️';
+        graphToggleLabels.style.opacity = window.__miniD3.showLabels ? '1' : '0.5';
+    }
+});
 
 function renderSimilarPaginated(items = []) {
     if (!Array.isArray(items) || items.length === 0) { 
@@ -692,6 +1199,67 @@ lensNext?.addEventListener('click', () => {
     }
 });
 
+// Filter event listeners
+filterOA?.addEventListener('change', () => {
+    const last = window.__lens_last_payload;
+    if (last) {
+        window.__lens_current_page = 1;
+        const tab = document.querySelector('[data-lens-tab].active')?.getAttribute('data-lens-tab') || 'similar';
+        const list = tab === 'refs' ? last.refs : tab === 'cited' ? last.cited : last.similar;
+        const filtered = applyFilters(list);
+        renderSimilarPaginated(filtered);
+        updatePagination(filtered.length);
+    }
+});
+
+filterRecent?.addEventListener('change', () => {
+    const last = window.__lens_last_payload;
+    if (last) {
+        window.__lens_current_page = 1;
+        const tab = document.querySelector('[data-lens-tab].active')?.getAttribute('data-lens-tab') || 'similar';
+        const list = tab === 'refs' ? last.refs : tab === 'cited' ? last.cited : last.similar;
+        const filtered = applyFilters(list);
+        renderSimilarPaginated(filtered);
+        updatePagination(filtered.length);
+    }
+});
+
+refreshLens?.addEventListener('click', async () => {
+    const last = window.__lens_last_payload;
+    if (last?.base?.openalex_id) {
+        lensList.textContent = 'Refreshing…';
+        try {
+            const [refs, cited] = await Promise.all([
+                getReferences(last.base.openalex_id),
+                getCitedBy(last.base.openalex_id)
+            ]);
+            const pool = [...refs, ...cited];
+            const similar = scoreSimilar(last.base, pool).slice(0, 20);
+            const payload = { base: last.base, refs, cited, similar };
+            chrome.storage.local.set({ [`lens_${last.base.doi || last.base.url}`]: { savedAt: Date.now(), payload } });
+            renderLens(null, payload);
+            showToast('Literature Lens refreshed');
+        } catch {
+            lensList.textContent = 'Refresh failed';
+        }
+    }
+});
+
+function applyFilters(items) {
+    let filtered = [...items];
+    
+    if (filterOA?.checked) {
+        filtered = filtered.filter(item => item.open_access || item.oa_url);
+    }
+    
+    if (filterRecent?.checked) {
+        const currentYear = new Date().getFullYear();
+        filtered = filtered.filter(item => item.year && item.year >= (currentYear - 5));
+    }
+    
+    return filtered;
+}
+
 // Lens tab switching
 document.querySelectorAll('[data-lens-tab]')?.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -703,8 +1271,9 @@ document.querySelectorAll('[data-lens-tab]')?.forEach(btn => {
             window.__lens_current_page = 1; // Reset to page 1 when switching tabs
             const tab = btn.getAttribute('data-lens-tab');
             const list = tab === 'refs' ? last.refs : tab === 'cited' ? last.cited : last.similar;
-            renderSimilarPaginated(list);
-            updatePagination(list.length);
+            const filtered = applyFilters(list);
+            renderSimilarPaginated(filtered);
+            updatePagination(filtered.length);
         }
     });
 });

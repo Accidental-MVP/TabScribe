@@ -409,13 +409,29 @@ button:hover {
 	display: flex;
 }
 
-#search {
-	flex: 1;
-	padding: 8px 12px;
-	border-radius: 8px;
-	border: 1px solid #2a3142;
-	background: #101522;
-	color: var(--text);
+/* Literature Lens scrollbar styling */
+#lens-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#lens-list::-webkit-scrollbar-track {
+    background: #1a1d29;
+    border-radius: 3px;
+}
+
+#lens-list::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #22d3ee 0%, #5eead4 100%);
+    border-radius: 3px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+#lens-list::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #38bdf8 0%, #7dd3fc 100%);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+}
+
+#lens-list::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, #0ea5e9 0%, #22d3ee 100%);
 }
 
 .action-buttons {

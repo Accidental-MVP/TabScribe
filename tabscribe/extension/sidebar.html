@@ -81,7 +81,7 @@
 		</div>
 	 </div>
 	<div class="modal-backdrop" id="similar-modal">
-		<div class="modal">
+		<div class="modal" style="max-height:95vh; overflow-y:auto;">
 			<h2>Literature Lens</h2>
 			<div class="row" id="lens-filters">
 				<button data-lens-tab="refs">References</button>
@@ -92,14 +92,25 @@
 				<label><input type="checkbox" id="filter-recent"/> Last 5y</label>
 				<button id="refresh-lens">Refresh</button>
 			</div>
-			<div id="lens-graph" style="height:120px; margin:6px 0; border:1px solid #2a3142; border-radius:8px;"></div>
-			<div id="lens-list">Searching…</div>
-			<div class="row" id="lens-pagination" style="display:none;">
-				<button id="lens-prev" disabled>← Prev</button>
-				<span id="lens-page-info">Page 1 of 1</span>
-				<button id="lens-next" disabled>Next →</button>
+			<div id="lens-graph" style="height:250px; margin:6px 0; border:1px solid #2a3142; border-radius:8px; position:relative; overflow:hidden;">
+				<div id="graph-controls" style="position:absolute; top:4px; right:4px; z-index:10;">
+					<button id="graph-maximize" style="background:#374151; border:none; color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">⛶</button>
+					<button id="graph-reset" style="background:#374151; border:none; color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer; margin-left:4px;">⌂</button>
+					<button id="graph-toggle-labels" style="background:#374151; border:none; color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer; margin-left:4px;">🏷️</button>
+				</div>
+				<div id="graph-info" style="position:absolute; top:4px; left:4px; z-index:10; background:rgba(0,0,0,0.7); padding:4px 8px; border-radius:4px; font-size:10px; color:#fff;">
+					<span id="graph-stats">Loading...</span>
+				</div>
 			</div>
-			<div class="row">
+			<div id="lens-content" style="display:flex; flex-direction:column; height:300px; min-height:200px;">
+				<div id="lens-list" style="flex:1; overflow-y:auto; padding-right:8px;">Searching…</div>
+				<div class="row" id="lens-pagination" style="display:none; margin-top:8px; flex-shrink:0;">
+					<button id="lens-prev" disabled>← Prev</button>
+					<span id="lens-page-info">Page 1 of 1</span>
+					<button id="lens-next" disabled>Next →</button>
+				</div>
+			</div>
+			<div class="row" style="margin-top:8px;">
 				<button id="close-similar">Close</button>
 			</div>
 		</div>
