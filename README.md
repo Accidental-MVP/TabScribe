@@ -1,4 +1,7 @@
 # 🧠 TabScribe — Research OS for the Web  
+
+![TabScribe Demo](./tabscribe/tabscribe-preview.gif)
+
 > **Capture. Summarize. Write. All inside your browser — powered by Chrome’s built-in AI (Gemini Nano).**  
 > [**→ Install on Chrome**](https://chromewebstore.google.com/detail/tabscribe-%E2%80%94-research-os-f/adajfbbemhhjpgmiedkgbaceiiahgafd)
 
