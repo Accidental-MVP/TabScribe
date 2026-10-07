@@ -1,127 +1,86 @@
-# 🧠 TabScribe — Research OS for the Web  
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/banner-light.png">
+  <img src="assets/banner-light.png" alt="TabScribe — research that never leaves your machine">
+</picture>
 
-![TabScribe Demo](./tabscribe/tabscribe-preview.gif)
+<p>
+  <a href="https://chromewebstore.google.com/detail/tabscribe-%E2%80%94-research-os-f/adajfbbemhhjpgmiedkgbaceiiahgafd"><img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Install-1a5490?style=flat-square&labelColor=14181b"></a>
+  <a href="https://chromewebstore.google.com/detail/tabscribe-%E2%80%94-research-os-f/adajfbbemhhjpgmiedkgbaceiiahgafd"><img alt="Users" src="https://img.shields.io/chrome-web-store/users/adajfbbemhhjpgmiedkgbaceiiahgafd?style=flat-square&labelColor=14181b&color=4c555c"></a>
+  <a href="https://chromewebstore.google.com/detail/tabscribe-%E2%80%94-research-os-f/adajfbbemhhjpgmiedkgbaceiiahgafd"><img alt="Rating" src="https://img.shields.io/chrome-web-store/rating/adajfbbemhhjpgmiedkgbaceiiahgafd?style=flat-square&labelColor=14181b&color=0a7d35"></a>
+  <img alt="Gemini Nano" src="https://img.shields.io/badge/Gemini_Nano-on--device-14181b?style=flat-square">
+  <img alt="MV3" src="https://img.shields.io/badge/Manifest_V3-14181b?style=flat-square">
+</p>
 
-> **Capture. Summarize. Write. All inside your browser — powered by Chrome’s built-in AI (Gemini Nano).**  
-> [**→ Install on Chrome**](https://chromewebstore.google.com/detail/tabscribe-%E2%80%94-research-os-f/adajfbbemhhjpgmiedkgbaceiiahgafd)
-
----
-
-## 🚀 Overview
-
-**TabScribe** is a privacy-first Chrome extension that turns your web snippets into structured research drafts — instantly.  
-It uses **Chrome’s built-in AI (Gemini Nano)** for summarization, rewriting, proofreading, translation, and content generation — all **offline-first** and fully local.
-
-It’s like having an intelligent note-taker, editor, and citation manager — right inside your browser.
-
----
-
-## 🧩 Core Features
-
-### ✍️ Capture Anything
-- Right-click → “Save to TabScribe” or press **Alt + S**
-- Auto-extracts **title, URL, favicon, and metadata (DOI)**
-- Preserves **HTML evidence snapshots** for traceability  
-
-### 🧠 AI-Powered Processing
-- **Summarizer** – concise, academic-style summaries  
-- **Rewriter** – tone presets (Concise | Academic | Friendly | Executive)  
-- **Proofreader** – grammar and style correction  
-- **Translator** – multilingual with auto-detection  
-- **Writer** – generates full research drafts from snippets  
-
-### 📂 Organized Research
-- Create and manage **multiple projects**  
-- Full-text **search & filter** across all notes  
-- **Trash / restore** system  
-- Works **offline-by-default** — data stays on your device  
-
-### 🎓 Literature & Citations (Hybrid Mode)
-- **Literature Lens:** visualize citation and reference networks  
-- **Automatic DOI & metadata fetching** (OpenAlex / Crossref)  
-- **Citation Styles:** APA | MLA | Harvard | BibTeX  
-- **Export:** Markdown & DOCX with embedded references  
-
-### 🎧 Multimodal Input
-- **Image Analysis:** drag & drop any image for AI explanation  
-- **Audio Notes:** record, transcribe, and attach to snippets  
+Capture web snippets, turn them into structured research drafts, and cite them — summarising,
+rewriting, translating and proofreading **entirely on your machine** through Chrome's built-in
+Gemini Nano. It works with the network off.
 
 ---
 
-## 🏗️ Architecture
+## Why on-device
 
-The project is organized into core extension components and documentation:
+Every AI research tool worth using uploads your reading to someone else's server. If you are
+working through unpublished results, confidential filings, or anything under embargo, that is
+not a privacy preference — it is the reason you cannot use the tool at all.
 
-- **`extension/`** - Browser extension source code
-  - `ai/` - AI features (summarize, rewrite, proofread, translate, write)
-  - `lib/` - Core utilities (IndexedDB, settings, export, citations)
-  - `sidebar.html` - Main side-panel interface
-  - `content_script.js` - Page interaction layer
-  - `service_worker.js` - Background processes
-  - `options.html` - Settings configuration
-- **`docs/`** - Project documentation
-  - Architecture, demo scripts, judging criteria, and privacy policy
+```mermaid
+flowchart LR
+    subgraph M["your machine"]
+        direction LR
+        P["page"] -- "Alt+S" --> CAP["capture<br/>title · URL · DOI · snapshot"]
+        CAP --> DB[("IndexedDB<br/>projects, notes, trash")]
+        DB <--> AI["Gemini Nano<br/>summarise · rewrite<br/>translate · proofread"]
+        DB --> OUT["draft + citations<br/>APA · MLA · Harvard · BibTeX"]
+    end
+    M -. "nothing crosses" .-x NET(["network"])
+```
 
----
+The dashed edge is the whole product. Everything else follows from it.
 
-### ⚙️ Tech Stack
-- **Manifest V3 Chrome Extension**
-- **Gemini Nano APIs** (Summarizer / Writer / Rewriter / Translator)
-- **IndexedDB + Chrome Storage** for offline data  
-- **Hybrid Mode:** Gemini API for advanced literature analysis  
-- **D3.js** visualization for literature networks  
+## What it does
 
----
+**Capture** — right-click or `Alt+S`. Extracts title, URL, favicon and DOI automatically, and
+stores an **HTML snapshot of the source**, so a quote stays traceable after the page changes
+underneath it.
 
-## 🔒 Privacy & Security
-- ✅ 100 % **Offline-first**  
-- ✅ **No accounts or cloud sync**  
-- ✅ **Transparent hybrid mode** indicator when external APIs are used  
-- ✅ All data stored locally via IndexedDB  
+**Process** — Chrome's built-in AI APIs, all local:
 
----
+| | |
+|---|---|
+| **Summarizer** | Concise, academic-style summaries |
+| **Rewriter** | Tone presets — concise, academic, friendly, executive |
+| **Proofreader** | Grammar and style |
+| **Translator** | Multilingual with auto-detection |
+| **Writer** | Full drafts from collected snippets |
 
-## 🧭 Demo Highlights
-1. Select text → Right-click → *Save to TabScribe*  
-2. Instantly **summarize / rewrite / proofread / translate**  
-3. Add **images or voice notes**  
-4. Generate **AI-structured drafts with citations**  
-5. **Export** to Markdown or DOCX  
+**Organise** — multiple projects, full-text search across every note, and trash-with-restore.
+Research tools that delete permanently do not get used twice.
 
----
+**Cite** — APA, MLA, Harvard and BibTeX, generated from metadata already captured rather than
+re-entered by hand.
 
-## 🧪 Current Version
-**v0.9.0 Beta**  
-✔ Core features functional  
-✔ Multimodal AI active  
-✔ Export system stable  
+## The interesting constraint
 
-🧩 Requires **Chrome 138+** with built-in AI features enabled  
+Gemini Nano is not a frontier model. The product had to be designed around what a small
+on-device model reliably does well — **bounded, single-document tasks** — instead of
+pretending it could reason across a whole corpus. Every feature above is scoped to one
+snippet or one note for that reason.
 
----
+## Install
 
-## 💡 Why TabScribe?
+[**Chrome Web Store**](https://chromewebstore.google.com/detail/tabscribe-%E2%80%94-research-os-f/adajfbbemhhjpgmiedkgbaceiiahgafd)
+· requires a Chrome version with built-in AI enabled.
 
-Because research today happens across countless tabs.  
-TabScribe brings **AI assistance, structure, and citations** directly where ideas begin — inside your browser.
+Or load unpacked:
 
----
+```bash
+git clone https://github.com/Accidental-MVP/TabScribe.git
+# chrome://extensions → Developer mode → Load unpacked
+```
 
-## 🛠️ Roadmap
-- 🔄 Collaboration & cloud sync (opt-in)  
-- 🗂️ Smart tag system  
-- 🧩 Plugin SDK for custom AI actions  
-- 📑 Advanced citation graph exploration  
+[Privacy policy](https://github.com/Accidental-MVP/tabscribe-privacy-policy)
 
 ---
 
-## 📄 License
-MIT License © 2025 Uday Parmar  
-
----
-
-## 🌐 Links
-- **Chrome Web Store:** [Install TabScribe](https://chromewebstore.google.com/detail/tabscribe-%E2%80%94-research-os-f/adajfbbemhhjpgmiedkgbaceiiahgafd)  
-- **Author:** [Uday Parmar](https://github.com/Accidental-MVP)  
-- **Keywords:** `chrome-extension` • `ai-research` • `gemini-nano` • `offline-first` • `summarization`  
-
+<sub>Built by <a href="https://uday-parmar.vercel.app">Uday Parmar</a></sub>
