@@ -24,17 +24,11 @@ Every AI research tool worth using uploads your reading to someone else's server
 working through unpublished results, confidential filings, or anything under embargo, that is
 not a privacy preference — it is the reason you cannot use the tool at all.
 
-```mermaid
-flowchart LR
-    subgraph M["your machine"]
-        direction LR
-        P["page"] -- "Alt+S" --> CAP["capture<br/>title · URL · DOI · snapshot"]
-        CAP --> DB[("IndexedDB<br/>projects, notes, trash")]
-        DB <--> AI["Gemini Nano<br/>summarise · rewrite<br/>translate · proofread"]
-        DB --> OUT["draft + citations<br/>APA · MLA · Harvard · BibTeX"]
-    end
-    M -. "nothing crosses" .-x NET(["network"])
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/boundary-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/boundary-light.png">
+  <img src="assets/boundary-light.png" alt="Capture, on-device inference and storage all sit inside the machine; nothing crosses to the network">
+</picture>
 
 The dashed edge is the whole product. Everything else follows from it.
 
